@@ -117,22 +117,47 @@ The interface. Dual-mode CLI following `/enhance-cli` pattern. Every command wor
 
 ---
 
-## Block 4: Daemon + Packaging ▸ `ready`
+## Block 4: Daemon + Packaging ▸ `done`
 
 The runtime. Long-running daemon for scheduled execution, plus pip-installable packaging for remote environments.
 
 **Scope:**
-- [ ] `autoresearch daemon start/stop/status/logs` commands
-- [ ] Schedule evaluation: read marker schedules, fire when due
-- [ ] PID file management: `~/.autoresearch/daemon.pid`
-- [ ] Log management: `~/.autoresearch/daemon.log`
-- [ ] Max concurrent markers limit
-- [ ] Crash recovery: detect stale PID, auto-restart
-- [ ] `pip install tccw-autoresearch` packaging (PyPI or private index)
-- [ ] Entry point: `autoresearch` CLI binary via pyproject.toml `[project.scripts]`
-- [ ] `.autoresearch.yaml` dogfood: markers for this repo's own self-improvement
-- [ ] End-to-end verification: fresh install → add marker → run → results
+- [x] `autoresearch daemon start/stop/status/logs` commands
+- [x] Schedule evaluation: read marker schedules, fire when due
+- [x] PID file management: `~/.autoresearch/daemon.pid`
+- [x] Log management: `~/.autoresearch/daemon.log`
+- [x] Max concurrent markers limit
+- [x] Crash recovery: detect stale PID (auto-restart deferred per SPECS 3.4)
+- [x] `pip install tccw-autoresearch` packaging (PyPI or private index)
+- [x] Entry point: `autoresearch` CLI binary via pyproject.toml `[project.scripts]`
+- [x] `.autoresearch.yaml` dogfood: markers for this repo's own self-improvement
+- [x] End-to-end verification: fresh install → add marker → run → results
 
-**Outputs:** `src/autoresearch/daemon.py`, packaging config, dogfood marker
+**Completed:** 2026-03-30 — 50 new tests (245 total), daemon + packaging ready
+**Outputs:** `src/autoresearch/daemon.py`, `utils.py`, `.autoresearch.yaml`, packaging config
 **Depends on:** Block 1 (state/config), Block 2 (engine), Block 3 (CLI commands)
 **SPECS reference:** Sections 3 (daemon), 9 (execution environments)
+
+**Design decisions:**
+### Sweep — 2026-03-30
+- **Issues found:** 18 (quality: 13, compliance: 3, integration: 6 — with deduplication: 14 unique)
+- **Fixed:** 10
+  - CRITICAL: `daemonize()` returned first-child PID (dead) instead of grandchild → pipe-based PID relay
+  - HIGH: `stop_daemon()` returned True even if process never terminated → return False on timeout
+  - HIGH: `is_pid_alive` returned False for `PermissionError` (alive process, different user) → return True
+  - HIGH: `daemonize()` didn't redirect stdin to `/dev/null` → added `os.dup2(devnull, stdin)`
+  - HIGH: `daemon_start` ignored `--config` flag → forward config to `daemonize()`
+  - MEDIUM: `logging.basicConfig` without `force=True` in daemon → added `force=True`
+  - MEDIUM: `parse_duration` regex not anchored, dead alternation order → `re.fullmatch` + longest-first
+  - MEDIUM: Stale PID didn't reset `state.daemon.running` → reset state in `stop_daemon`
+  - MEDIUM: `daemonize()` didn't `waitpid` first child (zombie) → added `os.waitpid`
+  - LOW: Dead `field` import in engine.py → removed
+- **Remaining:** 4 low-severity items (test coverage for timeout zombie scenario, daemon_logs --follow silently ignored in headless, license TOML format, end-to-end integration test script)
+
+**Design decisions:**
+- Cron evaluation via `croniter` (zero-dep, battle-tested)
+- Schedule types map to cron internally: overnight=`0 1 * * *`, weekend=`0 1 * * 6`, on-demand=never
+- Unix double-fork daemonization (no extra dependency)
+- `threading.Thread` + `Semaphore(max_concurrent)` for concurrent runs
+- `parse_duration()` extracted to shared `utils.py` (reused by engine + daemon)
+- State reloaded from disk each tick (CLI changes picked up automatically)

@@ -40,6 +40,10 @@ app = typer.Typer(
 
 console = Console()
 
+# Daemon sub-app
+daemon_app = typer.Typer(help="Daemon management commands")
+app.add_typer(daemon_app, name="daemon")
+
 
 def _init_ctx(ctx: typer.Context) -> None:
     """Ensure ctx.obj is populated (for subcommands invoked directly)."""
@@ -1015,3 +1019,171 @@ def _merge_interactive(ctx: typer.Context, tracked):
         console.print(f"[green]Merged {tracked.branch} into {target} ({commit[:7]})[/green]")
     except Exception as e:
         console.print(f"[red]Merge failed: {e}[/red]")
+
+
+# ---------------------------------------------------------------------------
+# Daemon subcommands
+# ---------------------------------------------------------------------------
+
+
+@daemon_app.command("start")
+def daemon_start(ctx: typer.Context):
+    """Start the daemon in the background."""
+    _init_ctx(ctx)
+    from autoresearch.daemon import (
+        PID_PATH,
+        check_stale_pid,
+        daemonize,
+        is_pid_alive,
+        read_pid,
+    )
+
+    check_stale_pid()
+    existing_pid = read_pid()
+    if existing_pid and is_pid_alive(existing_pid):
+        if is_headless(ctx):
+            headless_output(ctx, err_json(f"Daemon already running (PID {existing_pid})"))
+            raise typer.Exit(code=1)
+        console.print(f"[red]Daemon already running (PID {existing_pid})[/red]")
+        raise typer.Exit(code=1)
+
+    try:
+        config_path = ctx.obj.get("config_path")
+        config = None
+        if config_path:
+            from autoresearch.config import load_config
+            config = load_config(config_path)
+        child_pid = daemonize(config=config)
+        if is_headless(ctx):
+            headless_output(ctx, ok_json({"pid": child_pid, "action": "started"}))
+        else:
+            console.print(f"[green]Daemon started (PID {child_pid})[/green]")
+    except RuntimeError as e:
+        if is_headless(ctx):
+            headless_output(ctx, err_json(str(e)))
+            raise typer.Exit(code=1)
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(code=1)
+
+
+@daemon_app.command("stop")
+def daemon_stop(ctx: typer.Context):
+    """Stop the running daemon."""
+    _init_ctx(ctx)
+    from autoresearch.daemon import stop_daemon
+
+    stopped = stop_daemon()
+    if is_headless(ctx):
+        if stopped:
+            headless_output(ctx, ok_json({"action": "stopped"}))
+        else:
+            headless_output(ctx, err_json("No daemon running"))
+            raise typer.Exit(code=1)
+    else:
+        if stopped:
+            console.print("[green]Daemon stopped[/green]")
+        else:
+            console.print("[yellow]No daemon running[/yellow]")
+
+
+@daemon_app.command("status")
+def daemon_status(ctx: typer.Context):
+    """Show daemon status and scheduled markers."""
+    _init_ctx(ctx)
+    from autoresearch.daemon import (
+        _resolve_cron_expression,
+        check_stale_pid,
+        is_pid_alive,
+        read_pid,
+    )
+
+    check_stale_pid()
+    pid = read_pid()
+    running = pid is not None and is_pid_alive(pid)
+    state = _load_state(ctx)
+
+    scheduled = []
+    for tracked in state.markers:
+        _mf, marker, eff = _resolve_marker_data(tracked)
+        if not marker:
+            continue
+        cron_expr = _resolve_cron_expression(marker.schedule)
+        if cron_expr:
+            from croniter import croniter
+            from datetime import datetime, timezone
+
+            next_fire = None
+            if tracked.last_run:
+                try:
+                    last_dt = datetime.fromisoformat(tracked.last_run)
+                    if last_dt.tzinfo is None:
+                        last_dt = last_dt.replace(tzinfo=timezone.utc)
+                    next_fire = croniter(cron_expr, last_dt).get_next(datetime).isoformat()
+                except (ValueError, KeyError):
+                    pass
+            scheduled.append({
+                "marker": tracked.id,
+                "schedule_type": marker.schedule.type,
+                "cron": cron_expr,
+                "next_run": next_fire,
+                "last_run": tracked.last_run,
+            })
+
+    data = {
+        "running": running,
+        "pid": pid,
+        "started_at": state.daemon.started_at,
+        "scheduled_markers": scheduled,
+    }
+
+    if is_headless(ctx):
+        headless_output(ctx, ok_json(data))
+    else:
+        status_text = "[green]running[/green]" if running else "[dim]stopped[/dim]"
+        console.print(f"Daemon: {status_text}" + (f" (PID {pid})" if pid else ""))
+        if state.daemon.started_at:
+            console.print(f"Started: {state.daemon.started_at}")
+        if scheduled:
+            table = Table(title="Scheduled Markers")
+            table.add_column("Marker")
+            table.add_column("Schedule")
+            table.add_column("Next Run")
+            table.add_column("Last Run")
+            for s in scheduled:
+                table.add_row(s["marker"], s["cron"], s["next_run"] or "--", s["last_run"] or "--")
+            console.print(table)
+        else:
+            console.print("[dim]No scheduled markers.[/dim]")
+
+
+@daemon_app.command("logs")
+def daemon_logs(
+    ctx: typer.Context,
+    lines: int = typer.Option(50, "--lines", "-n", help="Number of lines to show"),
+    follow: bool = typer.Option(False, "--follow", "-f", help="Follow log output"),
+):
+    """Show daemon log output."""
+    _init_ctx(ctx)
+    from autoresearch.daemon import LOG_PATH
+
+    if not LOG_PATH.is_file():
+        if is_headless(ctx):
+            headless_output(ctx, err_json("No log file found"))
+            raise typer.Exit(code=1)
+        console.print("[dim]No log file found.[/dim]")
+        raise typer.Exit(code=1)
+
+    if follow:
+        if is_headless(ctx):
+            headless_output(ctx, err_json("--follow is not supported in headless mode"))
+            raise typer.Exit(code=2)
+        import subprocess
+        subprocess.run(["tail", "-f", "-n", str(lines), str(LOG_PATH)])
+    else:
+        content = LOG_PATH.read_text()
+        log_lines = content.splitlines()[-lines:]
+        if is_headless(ctx):
+            headless_output(ctx, ok_json({"lines": log_lines}))
+        else:
+            for line in log_lines:
+                console.print(line)

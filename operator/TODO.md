@@ -30,8 +30,8 @@
 
 ## Don't Forget
 
-- [ ] `autoresearch` CLI must be pip-installable for remote execution environments
-- [ ] Dogfood: `.autoresearch.yaml` in this repo itself for self-improvement
+- [x] `autoresearch` CLI must be pip-installable for remote execution environments
+- [x] Dogfood: `.autoresearch.yaml` in this repo itself for self-improvement
 - [ ] Program template generated at runtime from marker config — NOT stored in repo
 - [ ] Local status override (state.json) takes precedence over YAML status
 - [ ] Marker ID format: `repo_name:marker_name` — handle dir name conflicts with full path fallback

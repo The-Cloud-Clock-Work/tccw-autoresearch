@@ -125,6 +125,7 @@ class TestHeadlessStatus:
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "status", "-m", "nope:nope"])
         assert result.exit_code == 1
+        assert "error" in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -167,6 +168,7 @@ class TestHeadlessResults:
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "results", "-m", "nope:nope"])
         assert result.exit_code == 1
+        assert "error" in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -258,8 +260,10 @@ class TestHeadlessAdd:
         assert len(data["data"]["added"]) == 1
 
     def test_add_no_marker_file(self, tmp_path):
-        result = runner.invoke(app, ["--headless", "add", "--path", str(tmp_path)])
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "add", "--path", str(tmp_path)])
         assert result.exit_code == 1
+        assert "error" in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -400,20 +404,115 @@ class TestHeadlessNoCommand:
     def test_exits_code_2(self):
         result = runner.invoke(app, ["--headless"])
         assert result.exit_code == 2
+        assert "error" in result.output
 
 
 # ---------------------------------------------------------------------------
 # Interactive mode
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Daemon subcommands
+# ---------------------------------------------------------------------------
+
+class TestDaemonStatus:
+    def test_headless_status_stopped(self):
+        with (
+            patch("autoresearch.cli.load_state", return_value=AppState()),
+            patch("autoresearch.daemon.read_pid", return_value=None),
+            patch("autoresearch.daemon.check_stale_pid", return_value=False),
+        ):
+            result = runner.invoke(app, ["--headless", "daemon", "status"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["data"]["running"] is False
+
+    def test_headless_status_running(self):
+        import os
+        state = AppState()
+        state.daemon.running = True
+        state.daemon.pid = os.getpid()
+        state.daemon.started_at = "2026-03-30T01:00:00+00:00"
+
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.daemon.read_pid", return_value=os.getpid()),
+            patch("autoresearch.daemon.check_stale_pid", return_value=False),
+            patch("autoresearch.daemon.is_pid_alive", return_value=True),
+        ):
+            result = runner.invoke(app, ["--headless", "daemon", "status"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["data"]["running"] is True
+
+
+class TestDaemonStop:
+    def test_headless_stop_nothing_running(self):
+        with patch("autoresearch.daemon.stop_daemon", return_value=False):
+            result = runner.invoke(app, ["--headless", "daemon", "stop"])
+        assert result.exit_code == 1
+
+    def test_headless_stop_success(self):
+        with patch("autoresearch.daemon.stop_daemon", return_value=True):
+            result = runner.invoke(app, ["--headless", "daemon", "stop"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["data"]["action"] == "stopped"
+
+
+class TestDaemonStart:
+    def test_headless_already_running(self):
+        import os
+        with (
+            patch("autoresearch.daemon.check_stale_pid"),
+            patch("autoresearch.daemon.read_pid", return_value=os.getpid()),
+            patch("autoresearch.daemon.is_pid_alive", return_value=True),
+        ):
+            result = runner.invoke(app, ["--headless", "daemon", "start"])
+        assert result.exit_code == 1
+
+    def test_headless_start_success(self):
+        with (
+            patch("autoresearch.daemon.check_stale_pid"),
+            patch("autoresearch.daemon.read_pid", return_value=None),
+            patch("autoresearch.daemon.daemonize", return_value=12345),
+        ):
+            result = runner.invoke(app, ["--headless", "daemon", "start"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["data"]["pid"] == 12345
+
+
+class TestDaemonLogs:
+    def test_headless_no_log_file(self):
+        with patch("autoresearch.daemon.LOG_PATH", Path("/tmp/nonexistent.log")):
+            result = runner.invoke(app, ["--headless", "daemon", "logs"])
+        assert result.exit_code == 1
+
+    def test_headless_reads_log(self, tmp_path):
+        log_file = tmp_path / "daemon.log"
+        log_file.write_text("line1\nline2\nline3\n")
+        with patch("autoresearch.daemon.LOG_PATH", log_file):
+            result = runner.invoke(app, ["--headless", "daemon", "logs", "-n", "2"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["data"]["lines"] == ["line2", "line3"]
+
+
 class TestInteractiveMode:
     def test_quit_immediately(self):
-        with patch("autoresearch.cli.load_state", return_value=AppState()):
+        with (
+            patch("autoresearch.cli.load_state", return_value=AppState()),
+            patch("autoresearch.cli.find_marker_file", return_value=None),
+        ):
             result = runner.invoke(app, [], input="q\n")
         assert result.exit_code == 0
 
     def test_shows_no_markers_message(self):
-        with patch("autoresearch.cli.load_state", return_value=AppState()):
+        with (
+            patch("autoresearch.cli.load_state", return_value=AppState()),
+            patch("autoresearch.cli.find_marker_file", return_value=None),
+        ):
             result = runner.invoke(app, [], input="q\n")
         assert "No markers tracked" in result.stdout
 

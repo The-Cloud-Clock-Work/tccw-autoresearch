@@ -103,6 +103,7 @@ def finalize_marker(
                 _run_git(["commit", "-m", f"[autoresearch] {combined_desc}"], cwd=repo_path)
 
             metrics = [r.metric for r in group_results if r.metric is not None]
+            # Metric spread across grouped commits (max - min); None if single commit
             metric_delta = max(metrics) - min(metrics) if len(metrics) > 1 else None
 
             created_branches.append({
