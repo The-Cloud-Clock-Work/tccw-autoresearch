@@ -6,8 +6,8 @@
 
 ## Pending Decisions
 
-- [ ] CLI framework: `typer` vs `click` (both viable, typer has less boilerplate)
-- [ ] TUI rendering: `rich` vs `textual` (rich for tables/status, textual for full TUI)
+- [x] CLI framework: `typer` — entry point `cli:app` matches naturally, less boilerplate (resolved Block 3)
+- [x] TUI rendering: `rich` — tables + panels + prompts, textual overkill for action-key menus (resolved Block 3)
 - [x] Git operations: subprocess calls (**decided** — simpler, fewer deps, works everywhere)
 - [x] Marker file name confirmed: `.autoresearch.yaml`
 - [x] Results dir confirmed: `.autoresearch/`
