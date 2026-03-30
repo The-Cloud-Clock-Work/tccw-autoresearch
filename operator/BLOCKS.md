@@ -70,46 +70,94 @@ The core. The edit→test→measure→keep/discard loop with git worktree isolat
 
 ---
 
-## Block 3: CLI — Interactive + Headless ▸ `ready`
+## Block 3: CLI — Interactive + Headless ▸ `done`
 
 The interface. Dual-mode CLI following `/enhance-cli` pattern. Every command works interactively AND with `--headless`.
 
 **Scope:**
-- [ ] Root command group with `--headless` global flag
-- [ ] Home directory view: list all tracked markers, numbered selection, action keys
-- [ ] Repo directory view: auto-detect `.autoresearch.yaml`, prompt to register
-- [ ] Marker submenu: run, status, results, skip/unskip, pause/resume, ideas, confidence, finalize, merge
-- [ ] `autoresearch run -m <marker>` — invoke engine for single marker
-- [ ] `autoresearch run --repo <name>` — run all active markers in a repo
-- [ ] `autoresearch add` / `detach` / `skip` / `status` / `results` / `ideas` / `confidence`
-- [ ] `autoresearch finalize <marker>` — cherry-pick + squash winning commits into clean branches
-- [ ] `autoresearch merge <marker>` — merge finalized branch
-- [ ] Headless equivalents: JSON output for every command, all inputs via flags
-- [ ] Helper functions: headless_confirm, headless_prompt, headless_output
-- [ ] Rich tables for interactive display
+- [x] Root command group with `--headless` global flag
+- [x] Home directory view: list all tracked markers, numbered selection, action keys
+- [x] Repo directory view: auto-detect `.autoresearch.yaml`, prompt to register
+- [x] Marker submenu: run, status, results, skip/unskip, pause/resume, ideas, confidence, finalize, merge
+- [x] `autoresearch run -m <marker>` — invoke engine for single marker
+- [x] `autoresearch run --repo <name>` — run all active markers in a repo
+- [x] `autoresearch add` / `detach` / `skip` / `status` / `results` / `ideas` / `confidence`
+- [x] `autoresearch finalize <marker>` — cherry-pick + squash winning commits into clean branches
+- [x] `autoresearch merge <marker>` — merge finalized branch
+- [x] Headless equivalents: JSON output for every command, all inputs via flags
+- [x] Helper functions: headless_confirm, headless_prompt, headless_output
+- [x] Rich tables for interactive display
 
-**Outputs:** `src/autoresearch/cli.py`, `utils.py`
+**Completed:** 2026-03-30 — 49 new tests (192 total), all commands dual-mode
+**Outputs:** `src/autoresearch/cli.py`, `cli_utils.py`, `finalize.py`
 **Depends on:** Block 1 (marker/state/results models), Block 2 (engine invocation)
 **SPECS reference:** Sections 2.1-2.7 (CLI), 4.12 (finalization)
 
+**Design decisions:**
+- CLI framework: Typer (entry point `cli:app` matches `typer.Typer()` naturally)
+- Interactive input: `rich.prompt.Prompt.ask()` with character choices (portable, testable)
+- TUI rendering: `rich.table.Table` for marker lists, `rich.panel.Panel` for submenu detail
+- Finalization: separate `finalize.py` module (reusable by daemon in Block 4)
+- JSON convention: `{"status": "ok"/"error", "data": ...}` with exit codes 0/1/2
+
+### Sweep — 2026-03-30
+- **Issues found:** 16 (quality: 10, compliance: 3, integration: 3)
+- **Fixed:** 10
+  - CRITICAL: cherry-pick loop continues after failure in finalize.py → added `continue` + applied commit tracking
+  - HIGH: duplicated `_run_git` in finalize.py → import from worktree.py
+  - HIGH: `defaultdict` defeated by `.get()` in finalize.py → simplified to `dict.setdefault`
+  - HIGH: hardcoded `main` in merge-base → accept `target_branch` parameter
+  - HIGH: `$EDITOR` with spaces crashes subprocess → use `shlex.split`
+  - MEDIUM: missing headless `pause` command → added `@app.command("pause")`
+  - MEDIUM: error JSON goes to stdout not stderr → route errors to stderr in `headless_output`
+  - MEDIUM: dead `load_config` import in cli.py → removed
+  - MEDIUM: dead `state_path`/`config_path` code in `_load_state` → cleaned up
+  - MEDIUM: branch cleanup on failure uses `checkout -` not `source_branch` → fixed
+- **Remaining:** 6 low-severity items (test assertion gaps for error JSON structure, `metric_delta` semantics, double-prompt in repo mode UX)
+
 ---
 
-## Block 4: Daemon + Packaging ▸ `ready`
+## Block 4: Daemon + Packaging ▸ `done`
 
 The runtime. Long-running daemon for scheduled execution, plus pip-installable packaging for remote environments.
 
 **Scope:**
-- [ ] `autoresearch daemon start/stop/status/logs` commands
-- [ ] Schedule evaluation: read marker schedules, fire when due
-- [ ] PID file management: `~/.autoresearch/daemon.pid`
-- [ ] Log management: `~/.autoresearch/daemon.log`
-- [ ] Max concurrent markers limit
-- [ ] Crash recovery: detect stale PID, auto-restart
-- [ ] `pip install tccw-autoresearch` packaging (PyPI or private index)
-- [ ] Entry point: `autoresearch` CLI binary via pyproject.toml `[project.scripts]`
-- [ ] `.autoresearch.yaml` dogfood: markers for this repo's own self-improvement
-- [ ] End-to-end verification: fresh install → add marker → run → results
+- [x] `autoresearch daemon start/stop/status/logs` commands
+- [x] Schedule evaluation: read marker schedules, fire when due
+- [x] PID file management: `~/.autoresearch/daemon.pid`
+- [x] Log management: `~/.autoresearch/daemon.log`
+- [x] Max concurrent markers limit
+- [x] Crash recovery: detect stale PID (auto-restart deferred per SPECS 3.4)
+- [x] `pip install tccw-autoresearch` packaging (PyPI or private index)
+- [x] Entry point: `autoresearch` CLI binary via pyproject.toml `[project.scripts]`
+- [x] `.autoresearch.yaml` dogfood: markers for this repo's own self-improvement
+- [x] End-to-end verification: fresh install → add marker → run → results
 
-**Outputs:** `src/autoresearch/daemon.py`, packaging config, dogfood marker
+**Completed:** 2026-03-30 — 50 new tests (245 total), daemon + packaging ready
+**Outputs:** `src/autoresearch/daemon.py`, `utils.py`, `.autoresearch.yaml`, packaging config
 **Depends on:** Block 1 (state/config), Block 2 (engine), Block 3 (CLI commands)
 **SPECS reference:** Sections 3 (daemon), 9 (execution environments)
+
+**Design decisions:**
+### Sweep — 2026-03-30
+- **Issues found:** 18 (quality: 13, compliance: 3, integration: 6 — with deduplication: 14 unique)
+- **Fixed:** 10
+  - CRITICAL: `daemonize()` returned first-child PID (dead) instead of grandchild → pipe-based PID relay
+  - HIGH: `stop_daemon()` returned True even if process never terminated → return False on timeout
+  - HIGH: `is_pid_alive` returned False for `PermissionError` (alive process, different user) → return True
+  - HIGH: `daemonize()` didn't redirect stdin to `/dev/null` → added `os.dup2(devnull, stdin)`
+  - HIGH: `daemon_start` ignored `--config` flag → forward config to `daemonize()`
+  - MEDIUM: `logging.basicConfig` without `force=True` in daemon → added `force=True`
+  - MEDIUM: `parse_duration` regex not anchored, dead alternation order → `re.fullmatch` + longest-first
+  - MEDIUM: Stale PID didn't reset `state.daemon.running` → reset state in `stop_daemon`
+  - MEDIUM: `daemonize()` didn't `waitpid` first child (zombie) → added `os.waitpid`
+  - LOW: Dead `field` import in engine.py → removed
+- **Remaining:** 4 low-severity items (test coverage for timeout zombie scenario, daemon_logs --follow silently ignored in headless, license TOML format, end-to-end integration test script)
+
+**Design decisions:**
+- Cron evaluation via `croniter` (zero-dep, battle-tested)
+- Schedule types map to cron internally: overnight=`0 1 * * *`, weekend=`0 1 * * 6`, on-demand=never
+- Unix double-fork daemonization (no extra dependency)
+- `threading.Thread` + `Semaphore(max_concurrent)` for concurrent runs
+- `parse_duration()` extracted to shared `utils.py` (reused by engine + daemon)
+- State reloaded from disk each tick (CLI changes picked up automatically)

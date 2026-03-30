@@ -141,11 +141,11 @@ def _extract_metric(
         text = result.stdout.strip()
         if not text:
             return None
-        numbers = re.findall(r"-?\d+\.?\d*", text)
+        numbers = re.findall(r"-?(?:\d+\.?\d*|\.\d+)", text)
         if not numbers:
             return None
         return float(numbers[-1])
-    except (subprocess.TimeoutExpired, subprocess.CalledProcessError, ValueError):
+    except (subprocess.TimeoutExpired, ValueError):
         return None
 
 

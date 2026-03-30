@@ -437,6 +437,86 @@ class TestRunMarker:
         )
         assert result.discarded == 1
 
+
+    @patch("autoresearch.engine.remove_worktree")
+    @patch("autoresearch.engine.create_worktree")
+    @patch("autoresearch.engine.git_head_short", return_value="abc1234")
+    @patch("autoresearch.engine.git_reset_hard")
+    @patch("autoresearch.engine.git_commit", return_value="abc1234")
+    @patch("autoresearch.engine.run_harness")
+    @patch("autoresearch.engine.run_guard")
+    def test_guard_failure_rework_succeeds(self, mock_guard, mock_harness, mock_commit, mock_reset, mock_head, mock_create_wt, mock_rm_wt, git_repo, tmp_path):
+        """Guard failure -> rework fixes it -> keep."""
+        wt_path = tmp_path / "wt" / "test-marker"
+        wt_path.mkdir(parents=True, exist_ok=True)
+        from autoresearch.worktree import WorktreeInfo
+        mock_create_wt.return_value = WorktreeInfo(path=wt_path, branch="autoresearch/test", base_commit="abc1234")
+        mock_harness.return_value = HarnessResult(
+            exit_code=0, stdout="5 passed", stderr="",
+            metric=5.0, log_path=tmp_path / "run.log",
+        )
+        # First guard fails, rework guard passes
+        mock_guard.side_effect = [
+            GuardResult(passed=False, value=10.0, output="failed"),
+            GuardResult(passed=True, value=10.0, output="passed"),
+        ]
+
+        class CountingAgent(AgentRunner):
+            def __init__(self):
+                self.call_count = 0
+            def invoke(self, wt, prog, budget):
+                self.call_count += 1
+                return AgentResult(True, "rework test", 0, "")
+
+        marker = _make_marker(
+            guard=Guard(command="pytest -q", extract=None, threshold=None, rework_attempts=2),
+            loop=LoopConfig(max_experiments=1, budget_per_experiment="1m"),
+        )
+        agent = CountingAgent()
+        result = run_marker(
+            git_repo, marker, _make_state(), _make_tracked(),
+            agent, worktree_base=tmp_path / "wt", cleanup_worktree=False,
+        )
+        assert mock_guard.call_count == 2  # Main guard + rework guard
+        assert agent.call_count >= 2  # Initial + rework invoke
+
+    @patch("autoresearch.engine.remove_worktree")
+    @patch("autoresearch.engine.create_worktree")
+    @patch("autoresearch.engine.git_head_short", return_value="abc1234")
+    @patch("autoresearch.engine.git_reset_hard")
+    @patch("autoresearch.engine.git_commit", return_value="abc1234")
+    @patch("autoresearch.engine.run_harness")
+    @patch("autoresearch.engine.run_guard")
+    def test_guard_rework_all_attempts_fail(self, mock_guard, mock_harness, mock_commit, mock_reset, mock_head, mock_create_wt, mock_rm_wt, git_repo, tmp_path):
+        """Guard failure -> all rework attempts fail -> discard."""
+        wt_path = tmp_path / "wt" / "test-marker"
+        wt_path.mkdir(parents=True, exist_ok=True)
+        from autoresearch.worktree import WorktreeInfo
+        mock_create_wt.return_value = WorktreeInfo(path=wt_path, branch="autoresearch/test", base_commit="abc1234")
+        mock_harness.return_value = HarnessResult(
+            exit_code=0, stdout="5 passed", stderr="",
+            metric=5.0, log_path=tmp_path / "run.log",
+        )
+        mock_guard.return_value = GuardResult(passed=False, value=10.0, output="failed")
+
+        class CountingAgent(AgentRunner):
+            def __init__(self):
+                self.call_count = 0
+            def invoke(self, wt, prog, budget):
+                self.call_count += 1
+                return AgentResult(True, "rework test", 0, "")
+
+        marker = _make_marker(
+            guard=Guard(command="pytest -q", extract=None, threshold=None, rework_attempts=3),
+            loop=LoopConfig(max_experiments=1, budget_per_experiment="1m"),
+        )
+        agent = CountingAgent()
+        result = run_marker(
+            git_repo, marker, _make_state(), _make_tracked(),
+            agent, worktree_base=tmp_path / "wt", cleanup_worktree=False,
+        )
+        assert result.discarded >= 1
+
     def test_state_updated_after_run(self, git_repo, tmp_path):
         """Tracked marker state is updated after the run."""
         class WritingAgent(AgentRunner):

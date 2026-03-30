@@ -7,7 +7,7 @@ import re
 import shutil
 import subprocess
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -29,6 +29,7 @@ from autoresearch.results import (
     read_results,
 )
 from autoresearch.state import AppState, TrackedMarker, save_state
+from autoresearch.utils import parse_duration
 from autoresearch.worktree import (
     GitError,
     create_worktree,
@@ -497,26 +498,18 @@ def _write_discard_idea(
         pass
 
 
-def _parse_budget(budget: str) -> int:
-    """Parse a budget string like '10m' or '1h' to seconds."""
-    budget = budget.strip().lower()
-    match = re.match(r"(\d+)\s*(m|min|h|hr|s|sec)?", budget)
-    if not match:
-        return 600  # default 10 minutes
-    value = int(match.group(1))
-    unit = match.group(2) or "m"
-    if unit in ("h", "hr"):
-        return value * 3600
-    if unit in ("s", "sec"):
-        return value
-    return value * 60  # default to minutes
+_parse_budget = parse_duration
 
 
 def _extract_description(output: str) -> str:
-    """Extract a description from agent output (last commit message or hypothesis)."""
+    """Extract a description from agent output (last non-metadata line)."""
     lines = output.strip().splitlines() if output else []
     for line in reversed(lines):
         stripped = line.strip()
-        if stripped and len(stripped) > 5 and not stripped.startswith(("#", ">")):
-            return stripped[:200]
+        if not stripped or len(stripped) < 3:
+            continue
+        # Skip metadata: timestamps, log prefixes, shell prompts, dividers
+        if re.match(r"^(\d{4}-\d{2}|\[.*\]|>>>|===|---|\.\.\.|\$)", stripped):
+            continue
+        return stripped[:200]
     return "experiment"

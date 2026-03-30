@@ -6,8 +6,8 @@
 
 ## Pending Decisions
 
-- [ ] CLI framework: `typer` vs `click` (both viable, typer has less boilerplate)
-- [ ] TUI rendering: `rich` vs `textual` (rich for tables/status, textual for full TUI)
+- [x] CLI framework: `typer` — entry point `cli:app` matches naturally, less boilerplate (resolved Block 3)
+- [x] TUI rendering: `rich` — tables + panels + prompts, textual overkill for action-key menus (resolved Block 3)
 - [x] Git operations: subprocess calls (**decided** — simpler, fewer deps, works everywhere)
 - [x] Marker file name confirmed: `.autoresearch.yaml`
 - [x] Results dir confirmed: `.autoresearch/`
@@ -30,8 +30,8 @@
 
 ## Don't Forget
 
-- [ ] `autoresearch` CLI must be pip-installable for remote execution environments
-- [ ] Dogfood: `.autoresearch.yaml` in this repo itself for self-improvement
+- [x] `autoresearch` CLI must be pip-installable for remote execution environments
+- [x] Dogfood: `.autoresearch.yaml` in this repo itself for self-improvement
 - [ ] Program template generated at runtime from marker config — NOT stored in repo
 - [ ] Local status override (state.json) takes precedence over YAML status
 - [ ] Marker ID format: `repo_name:marker_name` — handle dir name conflicts with full path fallback

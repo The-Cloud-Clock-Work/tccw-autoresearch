@@ -196,3 +196,33 @@ class TestConfidenceLabel:
 
     def test_boundary_medium(self):
         assert confidence_label(1.0) == "MEDIUM"
+
+
+class TestExtractMetricEdgeCases:
+    def test_negative_decimal_without_leading_zero(self, work_dir):
+        """Regex should match -.5 as a valid number."""
+        result = run_harness(
+            command='echo "value: -.5"',
+            extract="cat",
+            worktree_path=work_dir,
+            marker_name="test-marker",
+        )
+        assert result.metric == -0.5
+
+    def test_negative_integer(self, work_dir):
+        result = run_harness(
+            command='echo "delta: -3"',
+            extract="cat",
+            worktree_path=work_dir,
+            marker_name="test-marker",
+        )
+        assert result.metric == -3.0
+
+    def test_decimal_without_leading_zero(self, work_dir):
+        result = run_harness(
+            command='echo "rate: .75"',
+            extract="cat",
+            worktree_path=work_dir,
+            marker_name="test-marker",
+        )
+        assert result.metric == 0.75

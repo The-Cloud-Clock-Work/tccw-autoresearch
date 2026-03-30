@@ -3,10 +3,15 @@ name = "tccw-autoresearch"
 version = "0.1.0"
 description = "Agnostic autonomous improvement engine"
 requires-python = ">=3.10"
+license = {text = "MIT"}
+readme = "README.md"
+keywords = ["autoresearch", "autonomous", "improvement", "testing"]
 dependencies = [
     "pydantic>=2.0",
     "pyyaml>=6.0",
     "rich>=13.0",
+    "typer>=0.12",
+    "croniter>=2.0",
 ]
 
 [project.optional-dependencies]
