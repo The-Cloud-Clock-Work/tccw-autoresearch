@@ -1,0 +1,57 @@
+markers:
+  - name: auth-flow-reliability
+    description: Improve auth flow test pass rate
+    status: active
+    target:
+      mutable:
+        - src/auth/*.py
+      immutable:
+        - tests/test_auth.py
+    metric:
+      command: "pytest tests/test_auth.py -q"
+      extract: "grep -oP '\\d+(?= passed)'"
+      direction: higher
+      baseline: 24
+      target: 34
+    guard:
+      command: "pytest tests/ -q --tb=no"
+      extract: "grep -oP '\\d+(?= passed)'"
+      threshold: 50
+      rework_attempts: 2
+    loop:
+      model: sonnet
+      budget_per_experiment: 10m
+      max_experiments: 50
+    escalation:
+      refine_after: 3
+      pivot_after: 5
+      search_after_pivots: 2
+      halt_after_pivots: 3
+    schedule:
+      type: on-demand
+    results:
+      branch_prefix: autoresearch/auth-flow
+      notify: []
+      auto_merge: false
+
+  - name: build-speed
+    description: Reduce Docker build time
+    status: skip
+    target:
+      mutable:
+        - Dockerfile
+      immutable:
+        - tests/smoke.sh
+    metric:
+      command: "time docker build -t test . 2>&1"
+      extract: "grep real | awk '{print $2}'"
+      direction: lower
+      baseline: 120
+    loop:
+      model: haiku
+      budget_per_experiment: 5m
+      max_experiments: 30
+    schedule:
+      type: on-demand
+    results:
+      branch_prefix: autoresearch/build-speed

@@ -1,0 +1,13 @@
+markers:
+  - name: simple-test
+    target:
+      mutable: [src/main.py]
+    metric:
+      command: "pytest"
+      extract: "grep -oP '\\d+(?= passed)'"
+      direction: higher
+      baseline: 10
+    loop:
+      model: sonnet
+      budget_per_experiment: 5m
+      max_experiments: 20
