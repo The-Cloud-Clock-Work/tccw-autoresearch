@@ -51,3 +51,5 @@ coverage.xml
 # Distribution
 *.tar.gz
 *.zip
+
+.claude/settings.local.json

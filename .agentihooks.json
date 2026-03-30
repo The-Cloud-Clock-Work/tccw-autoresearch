@@ -1,0 +1,8 @@
+  {
+    "profile": "colt",
+    "disabledMcpServers": [
+      "gateway-publish",
+      "gateway-home",
+      "gateway-dev"
+    ]
+  }
