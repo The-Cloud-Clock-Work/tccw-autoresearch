@@ -158,7 +158,12 @@ class ClaudeCodeRunner(AgentRunner):
             raise AgentError("'claude' CLI not found on PATH")
 
         timeout_seconds = _parse_budget(budget)
-        cmd = ["claude", "-p", program, "--model", self.model]
+        cmd = [
+            "claude",
+            "-p", program,
+            "--model", self.model,
+            "--dangerously-skip-permissions",
+        ]
 
         try:
             result = subprocess.run(
@@ -167,20 +172,25 @@ class ClaudeCodeRunner(AgentRunner):
                 capture_output=True,
                 text=True,
                 timeout=timeout_seconds,
+                errors="replace",
             )
-            description = _extract_description(result.stdout)
+            output = result.stdout or ""
+            description = _extract_description(output)
             return AgentResult(
                 success=result.returncode == 0,
                 description=description,
                 exit_code=result.returncode,
-                output=result.stdout[-2000:] if result.stdout else "",
+                output=output[-4000:],
             )
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as e:
+            partial = ""
+            if e.stdout:
+                partial = e.stdout if isinstance(e.stdout, str) else e.stdout.decode(errors="replace")
             return AgentResult(
                 success=False,
                 description="agent timeout",
                 exit_code=-1,
-                output="TIMEOUT",
+                output=partial[-2000:] if partial else "TIMEOUT",
             )
 
 
