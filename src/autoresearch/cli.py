@@ -36,6 +36,7 @@ app = typer.Typer(
     help="Autonomous code improvement engine",
     no_args_is_help=False,
     invoke_without_command=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
 )
 
 console = Console()
