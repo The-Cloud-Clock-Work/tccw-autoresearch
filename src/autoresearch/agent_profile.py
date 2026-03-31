@@ -9,6 +9,8 @@ from pathlib import Path
 
 from autoresearch.marker import Marker
 
+DEFAULT_AGENT_DIR = Path(__file__).parent / "agents" / "default"
+
 
 @dataclass
 class AgentPaths:
@@ -20,18 +22,25 @@ class AgentPaths:
     debug_log_path: Path
 
 
+def _load_default_settings() -> dict:
+    """Load the default agent settings.json as base."""
+    default_path = DEFAULT_AGENT_DIR / "settings.json"
+    if default_path.is_file():
+        return json.loads(default_path.read_text())
+    return {"permissions": {"allow": [], "deny": []}}
+
+
 def generate_settings(marker: Marker) -> dict:
     """Generate settings.json content from marker config.
 
-    Produces permissions that:
-    - Allow reads everywhere
+    Starts from default agent settings, then adds:
     - Allow edits only to mutable files
     - Deny edits to immutable files
-    - Deny destructive operations
     - Merge marker.agent.allowed_tools / disallowed_tools
     """
-    allow = ["Read(*)", "Glob(*)", "Grep(*)"]
-    deny = []
+    base = _load_default_settings()
+    allow = list(base.get("permissions", {}).get("allow", []))
+    deny = list(base.get("permissions", {}).get("deny", []))
 
     for pattern in marker.target.mutable:
         allow.append(f"Edit({pattern})")
@@ -40,13 +49,6 @@ def generate_settings(marker: Marker) -> dict:
     for pattern in marker.target.immutable:
         deny.append(f"Edit({pattern})")
         deny.append(f"Write({pattern})")
-
-    deny.extend([
-        "Bash(rm -rf:*)",
-        "Bash(git push:*)",
-        "Bash(git rebase:*)",
-        "Bash(git merge:*)",
-    ])
 
     for tool in marker.agent.allowed_tools:
         if tool not in allow:
@@ -60,14 +62,16 @@ def generate_settings(marker: Marker) -> dict:
 
 
 def generate_claude_md(marker: Marker) -> str:
-    """Generate CLAUDE.md system prompt content from marker config."""
-    lines = [
-        f"# AutoResearch Agent -- {marker.name}",
-        "",
-        "## Identity",
-        "You are an autonomous code improvement agent running under autoresearch.",
-        f"Marker: {marker.name}",
-    ]
+    """Generate CLAUDE.md system prompt content from marker config.
+
+    Starts from default agent CLAUDE.md, appends marker-specific context.
+    """
+    # Load default agent instructions
+    default_md_path = DEFAULT_AGENT_DIR / "CLAUDE.md"
+    base = default_md_path.read_text() if default_md_path.is_file() else ""
+
+    lines = [base.rstrip(), ""]
+    lines.append(f"# Marker: {marker.name}")
     if marker.description:
         lines.append(f"Description: {marker.description}")
     lines.append("")
@@ -82,13 +86,6 @@ def generate_claude_md(marker: Marker) -> str:
             lines.append(f"- {f}")
     else:
         lines.append("- Any file outside the mutable set")
-    lines.append("")
-    lines.append("## Rules")
-    lines.append("- NEVER ask for human input. You are autonomous.")
-    lines.append("- NEVER edit immutable files. The permission system will deny it.")
-    lines.append("- NEVER run destructive git operations (push, rebase, merge).")
-    lines.append("- Commit all changes with descriptive messages.")
-    lines.append("- If stuck, try a different approach rather than repeating.")
     lines.append("")
     return "\n".join(lines)
 
