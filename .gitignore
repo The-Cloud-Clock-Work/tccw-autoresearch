@@ -42,7 +42,6 @@ coverage.xml
 .DS_Store
 
 # Project runtime
-.autoresearch/
 *.pid
 
 # Jupyter

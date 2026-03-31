@@ -27,6 +27,7 @@ markers:
       budget_per_experiment: 25m
       max_experiments: 10
     agent:
+      name: default
       model: sonnet
       effort: medium
       permission_mode: bypassPermissions
