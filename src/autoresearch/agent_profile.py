@@ -126,6 +126,23 @@ def init_autoresearch_dir(repo_path: Path) -> Path:
     return ar_dir
 
 
+def link_agent_defaults(agent_dir: Path, default_dir: Path) -> None:
+    """Symlink default agent files into a custom agent dir.
+
+    Non-destructive: only creates symlinks where no file or symlink exists.
+    Existing real files and symlinks are never touched.
+    """
+    for src in default_dir.rglob("*"):
+        if not src.is_file():
+            continue
+        rel = src.relative_to(default_dir)
+        dst = agent_dir / rel
+        if dst.exists() or dst.is_symlink():
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.symlink_to(src)
+
+
 def ensure_agent_dir(
     worktree_path: Path,
     marker_name: str,
@@ -147,6 +164,10 @@ def ensure_agent_dir(
     claude_md = generate_claude_md(marker, worktree_path)
     claude_md_path = agent_dir / "CLAUDE.md"
     claude_md_path.write_text(claude_md)
+
+    # Symlink default agent files into custom agent dirs
+    if marker.agent.name != "default":
+        link_agent_defaults(agent_dir, DEFAULT_AGENT_DIR)
 
     ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
 

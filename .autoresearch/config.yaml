@@ -14,12 +14,12 @@ markers:
         - src/autoresearch/cli.py
     metric:
       command: "python3 -m pytest --tb=no -q 2>&1 | tail -1"
-      extract: '(\d+) passed'
+      extract: "grep -oP '\\d+(?= passed)'"
       direction: higher
       baseline: 281
     guard:
       command: "python3 -m pytest --tb=short -q 2>&1"
-      extract: '(\d+) passed'
+      extract: "grep -oP '\\d+(?= passed)'"
       threshold: 281
       rework_attempts: 2
     loop:

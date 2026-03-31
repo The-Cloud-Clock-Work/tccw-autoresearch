@@ -161,3 +161,35 @@ The runtime. Long-running daemon for scheduled execution, plus pip-installable p
 - `threading.Thread` + `Semaphore(max_concurrent)` for concurrent runs
 - `parse_duration()` extracted to shared `utils.py` (reused by engine + daemon)
 - State reloaded from disk each tick (CLI changes picked up automatically)
+
+---
+
+## Block 5: Agent Profiles + Telemetry ▸ `done`
+
+Hard permission enforcement via Claude Code's permission system, telemetry capture for feedback loops, and full agent project structure.
+
+**Scope:**
+- [x] `AgentConfig` model on `Marker` (name, model, effort, permission_mode, allowed/disallowed tools, extra_flags)
+- [x] `agent_profile.py` — generate `settings.json` + `CLAUDE.md` per marker at runtime
+- [x] `telemetry.py` — parse `--output-format stream-json` into `TelemetryReport` (tokens, cost, tools, errors)
+- [x] `ClaudeCodeRunner` rewrite — `--permission-mode bypassPermissions`, `--settings`, `--append-system-prompt-file`, `--allowedTools`/`--disallowedTools`
+- [x] Default agent as full Claude Code project: `.claude/` with settings, rules, commands, agents, skills
+- [x] `.env.example` + `.env` loading before agent subprocess
+- [x] `--append-system-prompt-file` for default CLAUDE.md injection into all agent runs
+- [x] `autoresearch init` — scaffold `.autoresearch/` with template config + default agent (additive, non-destructive)
+- [x] `init_autoresearch_dir()` resolves via `__file__` for both dev and pip installs
+- [x] Error feedback: telemetry errors/denials written to ideas.md
+- [x] Tests for agent_profile, telemetry modules
+
+**Completed:** 2026-03-31 — 281 tests across 17 files
+**Outputs:** `agent_profile.py`, `telemetry.py`, `src/autoresearch/agents/default/` (full project structure)
+**Depends on:** Block 1 (marker schema), Block 2 (engine ABC), Block 4 (daemon caller)
+**SPECS reference:** Section 4.13 (agent invocation — now designed and implemented)
+
+**Design decisions:**
+- `--permission-mode bypassPermissions` instead of `--dangerously-skip-permissions` (proper permission system)
+- `settings.json` generated at runtime from marker's mutable/immutable lists → `permissions.allow`/`deny`
+- Default agent dir at `src/autoresearch/agents/default/` — resolves via `Path(__file__).parent` for pip compatibility
+- Stream-json telemetry parsed into `TelemetryReport` dataclass with 12 fields
+- `.env` loaded via `dotenv` before subprocess, not passed as CLI flags (secrets stay out of process list)
+- `--append-system-prompt-file` injects default CLAUDE.md into all agents (base rules, identity, error recovery)

@@ -6,10 +6,12 @@ import json
 from pathlib import Path
 
 from autoresearch.agent_profile import (
+    DEFAULT_AGENT_DIR,
     AgentPaths,
     ensure_agent_dir,
     generate_claude_md,
     generate_settings,
+    link_agent_defaults,
 )
 from autoresearch.marker import (
     AgentConfig,
@@ -138,3 +140,63 @@ class TestEnsureAgentDir:
         paths1 = ensure_agent_dir(tmp_path, "test-marker", marker)
         paths2 = ensure_agent_dir(tmp_path, "test-marker", marker)
         assert paths1.agent_dir == paths2.agent_dir
+
+    def test_custom_agent_gets_default_symlinks(self, tmp_path):
+        marker = _make_marker(agent=AgentConfig(name="copilot"))
+        paths = ensure_agent_dir(tmp_path, "test-marker", marker)
+        # Should have symlinks from default agent
+        rules_dir = paths.agent_dir / ".claude" / "rules"
+        assert rules_dir.exists()
+        for item in rules_dir.iterdir():
+            if item.is_symlink():
+                assert item.resolve().is_file()
+
+    def test_default_agent_no_symlinks(self, tmp_path):
+        marker = _make_marker(agent=AgentConfig(name="default"))
+        paths = ensure_agent_dir(tmp_path, "test-marker", marker)
+        # Default agent should NOT get symlinks
+        symlinks = [f for f in paths.agent_dir.rglob("*") if f.is_symlink()]
+        assert symlinks == []
+
+
+class TestLinkAgentDefaults:
+    def test_creates_symlinks(self, tmp_path):
+        agent_dir = tmp_path / "custom"
+        agent_dir.mkdir()
+        link_agent_defaults(agent_dir, DEFAULT_AGENT_DIR)
+        # Should have symlinks for default agent files
+        symlinks = [f for f in agent_dir.rglob("*") if f.is_symlink()]
+        assert len(symlinks) > 0
+
+    def test_does_not_overwrite_real_files(self, tmp_path):
+        agent_dir = tmp_path / "custom"
+        agent_dir.mkdir()
+        # Create a real file that conflicts
+        claude_md = agent_dir / "CLAUDE.md"
+        claude_md.write_text("custom content")
+        link_agent_defaults(agent_dir, DEFAULT_AGENT_DIR)
+        # Real file should be untouched
+        assert claude_md.read_text() == "custom content"
+        assert not claude_md.is_symlink()
+
+    def test_does_not_overwrite_existing_symlinks(self, tmp_path):
+        agent_dir = tmp_path / "custom"
+        agent_dir.mkdir()
+        # Create an existing symlink
+        dummy = tmp_path / "dummy.md"
+        dummy.write_text("dummy")
+        claude_md = agent_dir / "CLAUDE.md"
+        claude_md.symlink_to(dummy)
+        link_agent_defaults(agent_dir, DEFAULT_AGENT_DIR)
+        # Should still point to dummy
+        assert claude_md.resolve() == dummy.resolve()
+
+    def test_symlinks_resolve_to_default(self, tmp_path):
+        agent_dir = tmp_path / "custom"
+        agent_dir.mkdir()
+        link_agent_defaults(agent_dir, DEFAULT_AGENT_DIR)
+        # All symlinks should resolve to files under DEFAULT_AGENT_DIR
+        for f in agent_dir.rglob("*"):
+            if f.is_symlink():
+                resolved = f.resolve()
+                assert str(resolved).startswith(str(DEFAULT_AGENT_DIR.resolve()))
