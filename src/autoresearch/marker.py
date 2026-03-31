@@ -9,6 +9,8 @@ from pydantic import BaseModel
 
 
 MARKER_FILENAME = ".autoresearch.yaml"
+CONFIG_DIR = ".autoresearch"
+CONFIG_FILENAME = "config.yaml"
 
 
 class MarkerStatus(str, Enum):
@@ -71,6 +73,7 @@ class ResultsConfig(BaseModel):
 
 
 class AgentConfig(BaseModel):
+    name: str = "default"
     model: str = ""
     effort: str = "medium"
     permission_mode: str = "bypassPermissions"
@@ -105,9 +108,12 @@ def load_markers(path: Path) -> MarkerFile:
 
 
 def find_marker_file(repo_path: Path) -> Path | None:
-    """Search for .autoresearch.yaml in repo root. Return path or None."""
-    candidate = repo_path / MARKER_FILENAME
-    return candidate if candidate.is_file() else None
+    """Search for marker config. Checks .autoresearch/config.yaml first, then .autoresearch.yaml."""
+    new_path = repo_path / CONFIG_DIR / CONFIG_FILENAME
+    if new_path.is_file():
+        return new_path
+    legacy_path = repo_path / MARKER_FILENAME
+    return legacy_path if legacy_path.is_file() else None
 
 
 def get_marker(marker_file: MarkerFile, name: str) -> Marker | None:

@@ -317,6 +317,103 @@ def confidence_cmd(
         console.print(f"[bold]Confidence:[/bold] {label}" + (f" ({score:.2f})" if score else ""))
 
 
+@app.command("init")
+def init_cmd(
+    ctx: typer.Context,
+    path: Path = typer.Option(".", "--path", help="Repo path (default: current directory)"),
+    name: str = typer.Option(..., "--name", "-n", help="Marker name"),
+    description: str = typer.Option("", "--description", "-d", help="Marker description"),
+    mutable: list[str] = typer.Option([], "--mutable", help="Mutable file patterns"),
+    immutable: list[str] = typer.Option([], "--immutable", help="Immutable file patterns"),
+    metric_command: str = typer.Option(..., "--metric-command", help="Command to measure metric"),
+    metric_extract: str = typer.Option(..., "--metric-extract", help="Regex to extract metric value"),
+    direction: str = typer.Option("higher", "--direction", help="Metric direction: higher or lower"),
+    budget: str = typer.Option("25m", "--budget", help="Budget per experiment"),
+    max_experiments: int = typer.Option(10, "--max-experiments", help="Max experiments per run"),
+):
+    """Initialize .autoresearch/ directory with a marker config and default agent."""
+    _init_ctx(ctx)
+    import subprocess as sp
+    import yaml
+    from autoresearch.agent_profile import init_autoresearch_dir
+    from autoresearch.marker import CONFIG_DIR, CONFIG_FILENAME
+
+    repo_path = path.resolve()
+    ar_dir = init_autoresearch_dir(repo_path)
+    config_path = ar_dir / CONFIG_FILENAME
+
+    # Auto-detect baseline by running metric command
+    baseline = None
+    try:
+        result = sp.run(
+            ["bash", "-c", metric_command],
+            cwd=repo_path, capture_output=True, text=True, timeout=120,
+        )
+        import re
+        numbers = re.findall(metric_extract, result.stdout + result.stderr)
+        if numbers:
+            baseline = float(numbers[-1])
+    except Exception:
+        pass
+
+    marker_config = {
+        "markers": [{
+            "name": name,
+            "description": description,
+            "status": "active",
+            "target": {
+                "mutable": mutable or ["src/**/*.py"],
+                "immutable": immutable,
+            },
+            "metric": {
+                "command": metric_command,
+                "extract": metric_extract,
+                "direction": direction,
+                "baseline": baseline or 0,
+            },
+            "guard": {
+                "command": metric_command,
+                "extract": metric_extract,
+                "threshold": baseline or 0,
+                "rework_attempts": 2,
+            },
+            "loop": {
+                "model": "sonnet",
+                "budget_per_experiment": budget,
+                "max_experiments": max_experiments,
+            },
+            "agent": {
+                "name": "default",
+                "model": "sonnet",
+                "effort": "medium",
+                "permission_mode": "bypassPermissions",
+            },
+            "schedule": {"type": "on-demand"},
+        }]
+    }
+
+    config_path.write_text(yaml.dump(marker_config, default_flow_style=False, sort_keys=False))
+
+    if is_headless(ctx):
+        headless_output(ctx, ok_json({
+            "path": str(ar_dir),
+            "config": str(config_path),
+            "marker": name,
+            "baseline": baseline,
+            "agents_dir": str(ar_dir / "agents"),
+        }))
+    else:
+        console.print(f"[green]Initialized .autoresearch/ in {repo_path}[/green]")
+        console.print(f"  Config: {config_path}")
+        console.print(f"  Agent:  {ar_dir / 'agents' / 'default'}/")
+        if baseline is not None:
+            console.print(f"  Baseline: {baseline} (auto-detected)")
+        else:
+            console.print("[yellow]  Baseline: could not auto-detect, set to 0[/yellow]")
+        console.print()
+        console.print("[dim]To customize the agent, duplicate .autoresearch/agents/default/ and reference it by name.[/dim]")
+
+
 @app.command("add")
 def add_cmd(
     ctx: typer.Context,

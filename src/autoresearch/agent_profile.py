@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,25 +23,44 @@ class AgentPaths:
     debug_log_path: Path
 
 
-def _load_default_settings() -> dict:
-    """Load the default agent settings.json as base."""
-    default_path = DEFAULT_AGENT_DIR / "settings.json"
-    if default_path.is_file():
-        return json.loads(default_path.read_text())
-    return {"permissions": {"allow": [], "deny": []}}
+def resolve_agent_dir(repo_path: Path, agent_name: str) -> Path | None:
+    """Resolve agent name to its directory in the repo's .autoresearch/agents/.
 
-
-def generate_settings(marker: Marker) -> dict:
-    """Generate settings.json content from marker config.
-
-    Starts from default agent settings, then adds:
-    - Allow edits only to mutable files
-    - Deny edits to immutable files
-    - Merge marker.agent.allowed_tools / disallowed_tools
+    Returns None if the agent doesn't exist in the repo.
     """
-    base = _load_default_settings()
-    allow = list(base.get("permissions", {}).get("allow", []))
-    deny = list(base.get("permissions", {}).get("deny", []))
+    repo_agent_dir = repo_path / ".autoresearch" / "agents" / agent_name
+    if repo_agent_dir.is_dir():
+        return repo_agent_dir
+    return None
+
+
+def _load_agent_base(repo_path: Path, agent_name: str) -> tuple[dict, str]:
+    """Load settings.json and CLAUDE.md from the named agent profile.
+
+    Resolution order:
+    1. .autoresearch/agents/<name>/ in the repo
+    2. src/autoresearch/agents/default/ (shipped default)
+    """
+    repo_dir = resolve_agent_dir(repo_path, agent_name)
+    if repo_dir:
+        base_dir = repo_dir
+    else:
+        base_dir = DEFAULT_AGENT_DIR
+
+    settings_path = base_dir / "settings.json"
+    settings = json.loads(settings_path.read_text()) if settings_path.is_file() else {"permissions": {"allow": [], "deny": []}}
+
+    claude_md_path = base_dir / "CLAUDE.md"
+    claude_md = claude_md_path.read_text() if claude_md_path.is_file() else ""
+
+    return settings, claude_md
+
+
+def generate_settings(marker: Marker, repo_path: Path | None = None) -> dict:
+    """Generate settings.json content from agent base + marker overrides."""
+    base_settings, _ = _load_agent_base(repo_path or Path("."), marker.agent.name)
+    allow = list(base_settings.get("permissions", {}).get("allow", []))
+    deny = list(base_settings.get("permissions", {}).get("deny", []))
 
     for pattern in marker.target.mutable:
         allow.append(f"Edit({pattern})")
@@ -61,16 +81,11 @@ def generate_settings(marker: Marker) -> dict:
     return {"permissions": {"allow": allow, "deny": deny}}
 
 
-def generate_claude_md(marker: Marker) -> str:
-    """Generate CLAUDE.md system prompt content from marker config.
+def generate_claude_md(marker: Marker, repo_path: Path | None = None) -> str:
+    """Generate CLAUDE.md from agent base + marker-specific context."""
+    _, base_md = _load_agent_base(repo_path or Path("."), marker.agent.name)
 
-    Starts from default agent CLAUDE.md, appends marker-specific context.
-    """
-    # Load default agent instructions
-    default_md_path = DEFAULT_AGENT_DIR / "CLAUDE.md"
-    base = default_md_path.read_text() if default_md_path.is_file() else ""
-
-    lines = [base.rstrip(), ""]
+    lines = [base_md.rstrip(), ""]
     lines.append(f"# Marker: {marker.name}")
     if marker.description:
         lines.append(f"Description: {marker.description}")
@@ -90,24 +105,44 @@ def generate_claude_md(marker: Marker) -> str:
     return "\n".join(lines)
 
 
+def init_autoresearch_dir(repo_path: Path) -> Path:
+    """Create .autoresearch/ directory with default agent profile.
+
+    Returns the .autoresearch/ path.
+    """
+    ar_dir = repo_path / ".autoresearch"
+    agents_dir = ar_dir / "agents" / "default"
+    agents_dir.mkdir(parents=True, exist_ok=True)
+
+    # Copy default agent from shipped package
+    for filename in ("CLAUDE.md", "settings.json"):
+        src = DEFAULT_AGENT_DIR / filename
+        dst = agents_dir / filename
+        if src.is_file() and not dst.is_file():
+            shutil.copy2(src, dst)
+
+    return ar_dir
+
+
 def ensure_agent_dir(
     worktree_path: Path,
     marker_name: str,
     marker: Marker,
 ) -> AgentPaths:
-    """Create .autoresearch/agents/<marker>/ with settings.json and CLAUDE.md.
+    """Create runtime agent dir with generated settings.json and CLAUDE.md.
 
-    Returns AgentPaths with all relevant paths.
+    Uses the repo's .autoresearch/agents/<name>/ as base if it exists,
+    otherwise falls back to the shipped default.
     """
     agent_dir = worktree_path / ".autoresearch" / "agents" / marker_name
     logs_dir = agent_dir / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
 
-    settings = generate_settings(marker)
+    settings = generate_settings(marker, worktree_path)
     settings_path = agent_dir / "settings.json"
     settings_path.write_text(json.dumps(settings, indent=2))
 
-    claude_md = generate_claude_md(marker)
+    claude_md = generate_claude_md(marker, worktree_path)
     claude_md_path = agent_dir / "CLAUDE.md"
     claude_md_path.write_text(claude_md)
 
