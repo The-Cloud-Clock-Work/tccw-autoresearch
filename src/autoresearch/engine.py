@@ -158,7 +158,7 @@ class ClaudeCodeRunner(AgentRunner):
         program: str,
         budget: str,
     ) -> AgentResult:
-        from autoresearch.agent_profile import ensure_agent_dir
+        from autoresearch.agent_profile import DEFAULT_AGENT_DIR, ensure_agent_dir
         from autoresearch.telemetry import (
             extract_description_from_telemetry,
             parse_stream_json,
@@ -173,8 +173,11 @@ class ClaudeCodeRunner(AgentRunner):
 
         model = self.agent_config.model or self.marker.loop.model or "sonnet"
 
-        # Run claude from the agent dir (inherits CLAUDE.md, .claude/settings, rules, etc.)
+        # Run claude from the agent dir (inherits its CLAUDE.md, .claude/settings, rules, etc.)
+        # Append the default agent's CLAUDE.md as base instructions for all agents
         # Use --add-dir to give access to the actual worktree
+        default_claude_md = DEFAULT_AGENT_DIR / "CLAUDE.md"
+
         cmd = [
             "claude", "-p", program,
             "--model", model,
@@ -184,6 +187,10 @@ class ClaudeCodeRunner(AgentRunner):
             "--verbose",
             "--debug-file", str(paths.debug_log_path),
         ]
+
+        # Inject default agent's CLAUDE.md into all agents
+        if default_claude_md.is_file():
+            cmd.extend(["--append-system-prompt-file", str(default_claude_md)])
 
         if self.agent_config.effort:
             cmd.extend(["--effort", self.agent_config.effort])
