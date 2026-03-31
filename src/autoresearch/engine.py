@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 import shutil
 import subprocess
@@ -192,6 +193,16 @@ class ClaudeCodeRunner(AgentRunner):
             cmd.extend(["--disallowedTools", *self.agent_config.disallowed_tools])
         cmd.extend(self.agent_config.extra_flags)
 
+        # Load .env from agent dir if it exists
+        env = dict(os.environ)
+        dot_env = paths.agent_dir / ".env"
+        if dot_env.is_file():
+            for line in dot_env.read_text().splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, _, value = line.partition("=")
+                    env[key.strip()] = value.strip()
+
         try:
             result = subprocess.run(
                 cmd,
@@ -200,6 +211,7 @@ class ClaudeCodeRunner(AgentRunner):
                 text=True,
                 timeout=timeout_seconds,
                 errors="replace",
+                env=env,
             )
             output = result.stdout or ""
 
