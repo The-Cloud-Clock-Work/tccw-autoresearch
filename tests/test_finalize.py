@@ -350,6 +350,67 @@ class TestFinalizeMarkerEdgeCases:
         assert len(branches) == 1
 
 
+class TestFinalizeCleanupGitErrorSuppressed:
+    """Cover finalize.py lines 120-121: inner GitError during cleanup is silently ignored."""
+
+    def test_cleanup_git_error_suppressed_when_cherry_pick_fails(self, tmp_path):
+        """When cherry-pick fails AND cleanup (checkout/branch -D) also raises GitError, it is suppressed."""
+        from autoresearch.finalize import finalize_marker
+        from autoresearch.results import ExperimentResult
+        from autoresearch.worktree import GitError
+
+        call_log = []
+
+        def selective_mock(args, cwd=None):
+            call_log.append(list(args))
+            # Fail cherry-pick to trigger outer except
+            if args[0] == "cherry-pick" and "--abort" not in args:
+                raise GitError("cherry-pick conflict")
+            # Also fail cleanup checkout to trigger inner except (lines 120-121)
+            if args[0] == "checkout" and len(args) == 2:
+                raise GitError("checkout failed during cleanup")
+            # Allow cherry-pick --abort and branch -D through (or also fail)
+            if args[0] == "branch" and "-D" in args:
+                raise GitError("branch -D failed during cleanup")
+            # Allow other calls (checkout-b, etc.)
+            return MagicMock(stdout="", returncode=0)
+
+        results = [
+            ExperimentResult(commit="abc1234", metric=5.0, guard="pass", status="keep", confidence="--", description="test-cleanup"),
+        ]
+        with patch("autoresearch.finalize._run_git", side_effect=selective_mock):
+            branches = finalize_marker(
+                tmp_path, "test-marker", results,
+                source_branch=None,
+            )
+        assert branches == []
+
+    def test_cleanup_git_error_suppressed_with_source_branch(self, tmp_path):
+        """Inner GitError during cleanup is suppressed even with source_branch set."""
+        from autoresearch.finalize import finalize_marker
+        from autoresearch.results import ExperimentResult
+        from autoresearch.worktree import GitError
+
+        def selective_mock(args, cwd=None):
+            if args[0] == "cherry-pick" and "--abort" not in args:
+                raise GitError("cherry-pick conflict")
+            if args[0] == "checkout" and len(args) == 2 and args[1] != "-":
+                raise GitError("checkout fails")
+            if args[0] == "branch" and "-D" in args:
+                raise GitError("branch delete fails")
+            return MagicMock(stdout="", returncode=0)
+
+        results = [
+            ExperimentResult(commit="def5678", metric=3.0, guard="pass", status="keep", confidence="--", description="cleanup-test"),
+        ]
+        with patch("autoresearch.finalize._run_git", side_effect=selective_mock):
+            branches = finalize_marker(
+                tmp_path, "test-marker", results,
+                source_branch="autoresearch/test-marker-mar30",
+            )
+        assert branches == []
+
+
 class TestMergeFinalized:
     def test_merge_into_main(self, git_repo):
         repo_path, env, commits = git_repo
