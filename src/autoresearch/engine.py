@@ -29,7 +29,7 @@ from autoresearch.results import (
     get_latest_metric,
     read_results,
 )
-from autoresearch.state import AppState, TrackedMarker, save_state
+from autoresearch.state import AppState, TrackedMarker, save_state, update_state
 from autoresearch.utils import parse_duration
 from autoresearch.worktree import (
     GitError,
@@ -456,19 +456,34 @@ def run_marker(
                 break
 
     finally:
-        # Always update state and attempt cleanup, even on exception
-        tracked.last_run_experiments = kept + discarded + crashed
-        tracked.last_run_kept = kept
-        tracked.last_run_discarded = discarded
-        tracked.current = current_best
-        tracked.branch = wt_info.branch
-        tracked.worktree_path = str(wt_info.path)
-        if final_status == "halted":
-            tracked.status_override = MarkerStatus.NEEDS_HUMAN
-        tracked.last_run = datetime.now(timezone.utc).isoformat()
+        # Atomic read-modify-write: reload state from disk so we don't
+        # overwrite markers added/removed by the CLI during the run.
+        _final_kept = kept
+        _final_discarded = discarded
+        _final_crashed = crashed
+        _final_best = current_best
+        _final_branch = wt_info.branch
+        _final_wt = str(wt_info.path)
+        _final_halted = final_status == "halted"
+        _final_time = datetime.now(timezone.utc).isoformat()
+        _marker_id = tracked.id
+
+        def _apply_run_results(fresh_state: AppState) -> None:
+            for m in fresh_state.markers:
+                if m.id == _marker_id:
+                    m.last_run_experiments = _final_kept + _final_discarded + _final_crashed
+                    m.last_run_kept = _final_kept
+                    m.last_run_discarded = _final_discarded
+                    m.current = _final_best
+                    m.branch = _final_branch
+                    m.worktree_path = _final_wt
+                    if _final_halted:
+                        m.status_override = MarkerStatus.NEEDS_HUMAN
+                    m.last_run = _final_time
+                    break
 
         if state_path:
-            save_state(state, state_path)
+            update_state(_apply_run_results, state_path)
 
         if cleanup_worktree:
             try:

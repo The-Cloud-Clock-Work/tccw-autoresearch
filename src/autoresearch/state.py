@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fcntl
 import json
 from pathlib import Path
 
@@ -47,16 +48,53 @@ def load_state(state_path: Path | None = None) -> AppState:
     if not path.is_file():
         return AppState()
     with open(path) as f:
+        fcntl.flock(f, fcntl.LOCK_SH)
         data = json.load(f)
+        fcntl.flock(f, fcntl.LOCK_UN)
     return AppState.model_validate(data)
 
 
 def save_state(state: AppState, state_path: Path | None = None) -> None:
-    """Write state to disk. Creates parent directory if needed."""
+    """Write state to disk with exclusive file lock."""
     path = state_path or STATE_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
         json.dump(state.model_dump(), f, indent=2)
+        f.flush()
+        fcntl.flock(f, fcntl.LOCK_UN)
+
+
+def update_state(update_fn, state_path: Path | None = None) -> AppState:
+    """Atomic read-modify-write on state.json.
+
+    Holds an exclusive lock for the entire operation so concurrent
+    writers (engine finishing + CLI adding markers) don't clobber
+    each other. update_fn receives the AppState and modifies it
+    in place.
+    """
+    path = state_path or STATE_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Open for read+write, create if missing
+    if not path.is_file():
+        path.write_text("{}")
+
+    with open(path, "r+") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            data = json.load(f)
+        except json.JSONDecodeError:
+            data = {}
+        state = AppState.model_validate(data)
+        update_fn(state)
+        f.seek(0)
+        f.truncate()
+        json.dump(state.model_dump(), f, indent=2)
+        f.flush()
+        fcntl.flock(f, fcntl.LOCK_UN)
+
+    return state
 
 
 def derive_marker_id(repo_path: Path, marker_name: str, state: AppState | None = None) -> str:

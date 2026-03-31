@@ -537,6 +537,11 @@ class TestRunMarker:
         tracked = _make_tracked()
         state = _make_state()
 
+        state.markers.append(tracked)
+        state_path = tmp_path / "state.json"
+        from autoresearch.state import save_state, load_state
+        save_state(state, state_path)
+
         with patch("autoresearch.engine.run_harness") as mock_h:
             mock_h.return_value = HarnessResult(
                 exit_code=0, stdout="5 passed", stderr="",
@@ -545,11 +550,14 @@ class TestRunMarker:
             run_marker(
                 git_repo, marker, state, tracked,
                 WritingAgent(), worktree_base=tmp_path / "wt", cleanup_worktree=False,
+                state_path=state_path,
             )
 
-        assert tracked.last_run is not None
-        assert tracked.last_run_experiments == 1
-        assert tracked.branch is not None
+        updated = load_state(state_path)
+        updated_tracked = next(m for m in updated.markers if m.id == tracked.id)
+        assert updated_tracked.last_run is not None
+        assert updated_tracked.last_run_experiments == 1
+        assert updated_tracked.branch is not None
 
 
 # --- FakeAgentRunner self-test ---
