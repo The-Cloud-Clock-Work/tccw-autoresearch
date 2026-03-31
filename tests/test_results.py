@@ -92,3 +92,59 @@ class TestMetricHelpers:
 
     def test_get_kept_metrics_empty(self):
         assert get_kept_metrics([]) == []
+
+    def test_get_latest_metric_only_discards(self):
+        results = [
+            ExperimentResult(commit="a", metric=5.0, status="discard", description=""),
+            ExperimentResult(commit="b", metric=6.0, status="crash", description=""),
+        ]
+        assert get_latest_metric(results) is None
+
+    def test_get_latest_metric_last_is_keep(self):
+        results = [
+            ExperimentResult(commit="a", metric=5.0, status="keep", description=""),
+            ExperimentResult(commit="b", metric=10.0, status="keep", description=""),
+        ]
+        assert get_latest_metric(results) == 10.0
+
+    def test_get_kept_metrics_all_discards(self):
+        results = [
+            ExperimentResult(commit="x", metric=99.0, status="discard", description=""),
+        ]
+        assert get_kept_metrics(results) == []
+
+
+class TestExperimentResultDefaults:
+    def test_guard_defaults_to_dashes(self):
+        r = ExperimentResult(commit="abc", metric=1.0, status="keep", description="")
+        assert r.guard == "--"
+
+    def test_confidence_defaults_to_dashes(self):
+        r = ExperimentResult(commit="abc", metric=1.0, status="keep", description="")
+        assert r.confidence == "--"
+
+    def test_metric_float_precision(self, tmp_path):
+        r = ExperimentResult(commit="abc1234", metric=87.654321, status="keep", description="precision")
+        append_result(tmp_path, "test", r)
+        results = read_results(tmp_path, "test")
+        assert abs(results[0].metric - 87.654321) < 0.0001
+
+    def test_multiple_appends_three_entries(self, tmp_path):
+        for i in range(3):
+            r = ExperimentResult(commit=f"commit{i}", metric=float(i * 10), status="keep", description=f"exp {i}")
+            append_result(tmp_path, "multi", r)
+        results = read_results(tmp_path, "multi")
+        assert len(results) == 3
+        assert results[2].commit == "commit2"
+
+    def test_discard_status_preserved(self, tmp_path):
+        r = ExperimentResult(commit="dd1", metric=5.0, status="discard", description="nope")
+        append_result(tmp_path, "test", r)
+        results = read_results(tmp_path, "test")
+        assert results[0].status == "discard"
+
+    def test_crash_status_preserved(self, tmp_path):
+        r = ExperimentResult(commit="cc1", metric=0.0, status="crash", description="boom")
+        append_result(tmp_path, "test", r)
+        results = read_results(tmp_path, "test")
+        assert results[0].status == "crash"

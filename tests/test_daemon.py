@@ -344,3 +344,275 @@ class TestStopDaemon:
 
         assert result is True
         mock_kill.assert_called_once_with(12345, 15)  # SIGTERM = 15
+
+
+# ---------------------------------------------------------------------------
+# Additional branch coverage
+# ---------------------------------------------------------------------------
+
+
+class TestIsPidAlivePermissionError:
+    def test_permission_error_returns_true(self):
+        """PermissionError means the process exists but is owned by another user."""
+        with patch("os.kill", side_effect=PermissionError):
+            assert is_pid_alive(12345) is True
+
+
+class TestIsDueNaiveDatetime:
+    def test_naive_last_run_treated_as_utc(self):
+        """Naive ISO strings (no tzinfo) should be treated as UTC."""
+        # 3 hours ago naive → should be due for hourly cron
+        naive_dt = (datetime.now(timezone.utc) - timedelta(hours=3)).replace(tzinfo=None)
+        last_run = naive_dt.isoformat()
+        assert is_due(_make_schedule("cron", "0 * * * *"), last_run) is True
+
+
+class TestDaemonRunnerRun:
+    def test_run_calls_tick_then_joins(self):
+        from autoresearch.config import GlobalConfig
+        runner = DaemonRunner(config=GlobalConfig())
+
+        tick_calls = []
+
+        def fake_tick():
+            tick_calls.append(1)
+            runner.shutdown()  # Trigger exit after first tick
+
+        runner._tick = fake_tick
+
+        with patch.object(runner, "_join_threads") as mock_join:
+            runner.run()
+
+        assert len(tick_calls) == 1
+        mock_join.assert_called_once()
+
+    def test_run_catches_tick_exception(self):
+        from autoresearch.config import GlobalConfig
+        runner = DaemonRunner(config=GlobalConfig())
+
+        call_count = [0]
+
+        def exploding_tick():
+            call_count[0] += 1
+            runner.shutdown()
+            raise RuntimeError("boom")
+
+        runner._tick = exploding_tick
+
+        # Should not raise
+        runner.run()
+        assert call_count[0] == 1
+
+
+class TestDaemonRunnerTickBranches:
+    def _make_runner(self):
+        from autoresearch.config import GlobalConfig
+        return DaemonRunner(config=GlobalConfig())
+
+    def test_no_marker_file_skips(self):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        runner = self._make_runner()
+
+        with (
+            patch("autoresearch.daemon.load_state", return_value=state),
+            patch("autoresearch.daemon.find_marker_file", return_value=None),
+        ):
+            runner._tick()
+        assert len(runner._active_runs) == 0
+
+    def test_load_markers_error_skips(self):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        runner = self._make_runner()
+
+        with (
+            patch("autoresearch.daemon.load_state", return_value=state),
+            patch("autoresearch.daemon.find_marker_file", return_value=Path("/tmp/fake.yaml")),
+            patch("autoresearch.daemon.load_markers", side_effect=ValueError("bad yaml")),
+        ):
+            runner._tick()
+        assert len(runner._active_runs) == 0
+
+    def test_marker_not_found_skips(self):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        runner = self._make_runner()
+        mf = MagicMock()
+
+        with (
+            patch("autoresearch.daemon.load_state", return_value=state),
+            patch("autoresearch.daemon.find_marker_file", return_value=Path("/tmp/fake.yaml")),
+            patch("autoresearch.daemon.load_markers", return_value=mf),
+            patch("autoresearch.daemon.get_marker", return_value=None),
+        ):
+            runner._tick()
+        assert len(runner._active_runs) == 0
+
+
+class TestDaemonRunnerThread:
+    def _make_runner(self):
+        from autoresearch.config import GlobalConfig
+        return DaemonRunner(config=GlobalConfig())
+
+    def test_run_marker_thread_success(self):
+        tracked = _make_tracked()
+        marker = _make_marker()
+        state = AppState(markers=[tracked])
+        runner = self._make_runner()
+        mock_result = MagicMock(experiments=1, kept=1)
+        runner._semaphore.acquire()  # Simulate semaphore acquired before thread starts
+
+        with (
+            patch("autoresearch.daemon.load_state", return_value=state),
+            patch("autoresearch.daemon.get_tracked", return_value=tracked),
+            patch("autoresearch.daemon.get_agent_runner", return_value=MagicMock()),
+            patch("autoresearch.daemon.run_marker", return_value=mock_result),
+        ):
+            runner._run_marker_thread(tracked, marker)
+        # Semaphore should have been released (value back to initial)
+        assert runner._semaphore._value == runner._config.daemon.max_concurrent
+
+    def test_run_marker_thread_tracked_not_found(self):
+        tracked = _make_tracked()
+        marker = _make_marker()
+        state = AppState(markers=[tracked])
+        runner = self._make_runner()
+        runner._semaphore.acquire()
+
+        with (
+            patch("autoresearch.daemon.load_state", return_value=state),
+            patch("autoresearch.daemon.get_tracked", return_value=None),
+        ):
+            runner._run_marker_thread(tracked, marker)
+        # No crash, semaphore released
+        assert runner._semaphore._value == runner._config.daemon.max_concurrent
+
+    def test_run_marker_thread_engine_error(self):
+        from autoresearch.engine import EngineError
+        tracked = _make_tracked()
+        marker = _make_marker()
+        state = AppState(markers=[tracked])
+        runner = self._make_runner()
+        runner._semaphore.acquire()
+
+        with (
+            patch("autoresearch.daemon.load_state", return_value=state),
+            patch("autoresearch.daemon.get_tracked", return_value=tracked),
+            patch("autoresearch.daemon.get_agent_runner", return_value=MagicMock()),
+            patch("autoresearch.daemon.run_marker", side_effect=EngineError("engine fail")),
+        ):
+            runner._run_marker_thread(tracked, marker)
+        assert runner._semaphore._value == runner._config.daemon.max_concurrent
+
+    def test_run_marker_thread_unexpected_exception(self):
+        tracked = _make_tracked()
+        marker = _make_marker()
+        state = AppState(markers=[tracked])
+        runner = self._make_runner()
+        runner._semaphore.acquire()
+
+        with (
+            patch("autoresearch.daemon.load_state", return_value=state),
+            patch("autoresearch.daemon.get_tracked", return_value=tracked),
+            patch("autoresearch.daemon.get_agent_runner", return_value=MagicMock()),
+            patch("autoresearch.daemon.run_marker", side_effect=RuntimeError("unexpected")),
+        ):
+            runner._run_marker_thread(tracked, marker)
+        assert runner._semaphore._value == runner._config.daemon.max_concurrent
+
+
+class TestDaemonRunnerJoinThreads:
+    def test_join_threads_waits(self):
+        from autoresearch.config import GlobalConfig
+        runner = DaemonRunner(config=GlobalConfig())
+
+        mock_thread = MagicMock()
+        runner._active_runs = {"m1": mock_thread}
+        runner._join_threads(timeout=1.0)
+
+        mock_thread.join.assert_called_once_with(timeout=1.0)
+
+    def test_join_threads_multiple(self):
+        from autoresearch.config import GlobalConfig
+        runner = DaemonRunner(config=GlobalConfig())
+
+        t1 = MagicMock()
+        t2 = MagicMock()
+        runner._active_runs = {"m1": t1, "m2": t2}
+        runner._join_threads(timeout=2.0)
+
+        t1.join.assert_called_once_with(timeout=2.0)
+        t2.join.assert_called_once_with(timeout=2.0)
+
+    def test_join_threads_empty(self):
+        from autoresearch.config import GlobalConfig
+        runner = DaemonRunner(config=GlobalConfig())
+        runner._active_runs = {}
+        # Should not raise
+        runner._join_threads(timeout=1.0)
+
+
+class TestDaemonRunnerReapThreads:
+    def test_removes_dead_threads(self):
+        from autoresearch.config import GlobalConfig
+        runner = DaemonRunner(config=GlobalConfig())
+
+        alive = MagicMock()
+        alive.is_alive.return_value = True
+        dead = MagicMock()
+        dead.is_alive.return_value = False
+        runner._active_runs = {"alive": alive, "dead": dead}
+        runner._reap_threads()
+
+        assert "alive" in runner._active_runs
+        assert "dead" not in runner._active_runs
+
+    def test_keeps_all_when_alive(self):
+        from autoresearch.config import GlobalConfig
+        runner = DaemonRunner(config=GlobalConfig())
+
+        t1 = MagicMock()
+        t1.is_alive.return_value = True
+        t2 = MagicMock()
+        t2.is_alive.return_value = True
+        runner._active_runs = {"m1": t1, "m2": t2}
+        runner._reap_threads()
+
+        assert len(runner._active_runs) == 2
+
+    def test_removes_all_when_dead(self):
+        from autoresearch.config import GlobalConfig
+        runner = DaemonRunner(config=GlobalConfig())
+
+        t1 = MagicMock()
+        t1.is_alive.return_value = False
+        t2 = MagicMock()
+        t2.is_alive.return_value = False
+        runner._active_runs = {"m1": t1, "m2": t2}
+        runner._reap_threads()
+
+        assert len(runner._active_runs) == 0
+
+
+class TestDaemonRunnerShutdown:
+    def test_shutdown_sets_event(self):
+        from autoresearch.config import GlobalConfig
+        runner = DaemonRunner(config=GlobalConfig())
+        assert not runner._shutdown.is_set()
+        runner.shutdown()
+        assert runner._shutdown.is_set()
+
+
+class TestStopDaemonPidDiesAfterCheck:
+    def test_pid_alive_at_check_dead_at_kill_returns_false(self, tmp_path):
+        """Lines 343-345: pid present but dies between check_stale_pid and is_pid_alive call."""
+        pid_path = tmp_path / "test.pid"
+        write_pid(12345, pid_path)
+        # First call (in check_stale_pid): alive → don't clear
+        # Second call (in stop_daemon body): dead → clear and return False
+        with patch("autoresearch.daemon.is_pid_alive", side_effect=[True, False]):
+            result = stop_daemon(pid_path=pid_path)
+        assert result is False
+        # pid file should be cleared
+        assert read_pid(pid_path) is None

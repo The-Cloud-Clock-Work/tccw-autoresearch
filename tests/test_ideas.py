@@ -72,3 +72,31 @@ class TestAppendIdea:
         content = read_ideas(tmp_path, "test")
         assert "Ideas Backlog" in content
         assert "- auto-created" in content
+
+    def test_section_header_in_sections_map(self):
+        assert "Discarded but Promising" in SECTIONS
+        assert "Near-Misses" in SECTIONS
+        assert "External Research" in SECTIONS
+
+    def test_all_three_sections_independently(self, tmp_path):
+        append_idea(tmp_path, "all3", "Discarded but Promising", "D entry")
+        append_idea(tmp_path, "all3", "Near-Misses", "N entry")
+        append_idea(tmp_path, "all3", "External Research", "E entry")
+        content = read_ideas(tmp_path, "all3")
+        assert "- D entry" in content
+        assert "- N entry" in content
+        assert "- E entry" in content
+
+    def test_append_to_external_research_last_section(self, tmp_path):
+        """External Research is the last section — exercises end-of-file append path."""
+        append_idea(tmp_path, "last", "External Research", "first external")
+        append_idea(tmp_path, "last", "External Research", "second external")
+        content = read_ideas(tmp_path, "last")
+        assert content.index("first external") < content.index("second external")
+
+    def test_read_returns_full_template_content(self, tmp_path):
+        create_ideas_template(tmp_path, "read-test")
+        content = read_ideas(tmp_path, "read-test")
+        assert "## Discarded but Promising" in content
+        assert "## Near-Misses" in content
+        assert "## External Research" in content

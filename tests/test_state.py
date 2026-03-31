@@ -134,3 +134,74 @@ class TestDeriveMarkerId:
         # repo_b has same dirname "myrepo" but different path — should use full path
         marker_id = derive_marker_id(repo_b, "marker-b", state)
         assert str(repo_b.resolve()) in marker_id
+
+    def test_no_conflict_same_path(self, tmp_path):
+        repo = tmp_path / "myrepo"
+        repo.mkdir()
+        state = AppState()
+        track_marker(state, repo, _make_marker("marker-a"))
+        # same path, different marker — no conflict, use dirname
+        marker_id = derive_marker_id(repo, "marker-b", state)
+        assert marker_id == "myrepo:marker-b"
+
+    def test_no_state_uses_dirname(self):
+        marker_id = derive_marker_id(Path("/some/path/repo"), "my-marker")
+        assert marker_id == "repo:my-marker"
+
+
+class TestLoadSaveStateExtra:
+    def test_save_daemon_state(self, tmp_path):
+        path = tmp_path / "state.json"
+        state = AppState()
+        state.daemon.running = True
+        state.daemon.pid = 12345
+        state.daemon.started_at = "2026-03-31T00:00:00"
+        save_state(state, path)
+        loaded = load_state(path)
+        assert loaded.daemon.running is True
+        assert loaded.daemon.pid == 12345
+        assert loaded.daemon.started_at == "2026-03-31T00:00:00"
+
+    def test_empty_markers_list(self, tmp_path):
+        path = tmp_path / "state.json"
+        save_state(AppState(), path)
+        loaded = load_state(path)
+        assert loaded.markers == []
+
+    def test_roundtrip_with_all_tracked_fields(self, tmp_path):
+        path = tmp_path / "state.json"
+        state = AppState()
+        state.markers.append(TrackedMarker(
+            id="repo:marker",
+            repo_path="/tmp/repo",
+            repo_name="repo",
+            marker_name="marker",
+            baseline=10.0,
+            current=15.0,
+            last_run="2026-03-31",
+            last_run_experiments=5,
+            last_run_kept=3,
+            last_run_discarded=2,
+            branch="autoresearch/marker-mar31",
+            worktree_path="/tmp/wt",
+        ))
+        save_state(state, path)
+        loaded = load_state(path)
+        m = loaded.markers[0]
+        assert m.current == 15.0
+        assert m.last_run_kept == 3
+        assert m.branch == "autoresearch/marker-mar31"
+
+
+class TestTrackedMarkerDefaults:
+    def test_default_status_override_is_none(self):
+        t = TrackedMarker(id="r:m", repo_path="/p", repo_name="r", marker_name="m")
+        assert t.status_override is None
+
+    def test_default_baseline_is_none(self):
+        t = TrackedMarker(id="r:m", repo_path="/p", repo_name="r", marker_name="m")
+        assert t.baseline is None
+
+    def test_default_last_run_is_none(self):
+        t = TrackedMarker(id="r:m", repo_path="/p", repo_name="r", marker_name="m")
+        assert t.last_run is None

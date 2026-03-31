@@ -101,3 +101,62 @@ class TestResolveMarkerId:
     def test_raises_on_invalid(self):
         with pytest.raises(ValueError):
             resolve_marker_id("no-colon-here")
+
+
+class TestMarkerDefaults:
+    def test_marker_status_default_active(self):
+        from autoresearch.marker import Metric, MetricDirection, Target, LoopConfig
+        m = Marker(
+            name="test",
+            target=Target(mutable=["src/foo.py"]),
+            metric=Metric(command="pytest", extract="grep", direction=MetricDirection.HIGHER, baseline=0),
+            loop=LoopConfig(),
+        )
+        assert m.status == MarkerStatus.ACTIVE
+        assert m.description == ""
+
+    def test_guard_defaults(self):
+        from autoresearch.marker import Guard
+        g = Guard()
+        assert g.command is None
+        assert g.threshold is None
+        assert g.rework_attempts == 2
+
+    def test_escalation_defaults(self):
+        from autoresearch.marker import Escalation
+        e = Escalation()
+        assert e.refine_after == 3
+        assert e.pivot_after == 5
+        assert e.search_after_pivots == 2
+        assert e.halt_after_pivots == 3
+
+    def test_loop_config_defaults(self):
+        from autoresearch.marker import LoopConfig
+        lc = LoopConfig()
+        assert lc.model == "sonnet"
+        assert lc.max_experiments == 50
+        assert lc.budget_per_experiment == "10m"
+
+    def test_marker_status_enum_values(self):
+        assert MarkerStatus.ACTIVE == "active"
+        assert MarkerStatus.SKIP == "skip"
+        assert MarkerStatus.PAUSED == "paused"
+        assert MarkerStatus.COMPLETED == "completed"
+
+    def test_find_marker_file_prefers_config_dir(self, tmp_path):
+        from autoresearch.marker import find_marker_file, CONFIG_DIR, CONFIG_FILENAME, MARKER_FILENAME
+        # Create both paths
+        config_dir = tmp_path / CONFIG_DIR
+        config_dir.mkdir()
+        config_file = config_dir / CONFIG_FILENAME
+        config_file.write_text("markers: []")
+        legacy = tmp_path / MARKER_FILENAME
+        legacy.write_text("markers: []")
+        # Should prefer config dir
+        result = find_marker_file(tmp_path)
+        assert result == config_file
+
+    def test_marker_file_get_marker_returns_none_for_missing(self):
+        from autoresearch.marker import MarkerFile
+        mf = MarkerFile(markers=[])
+        assert get_marker(mf, "nonexistent") is None

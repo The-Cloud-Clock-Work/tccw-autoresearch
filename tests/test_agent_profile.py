@@ -11,6 +11,7 @@ from autoresearch.agent_profile import (
     ensure_agent_dir,
     generate_claude_md,
     generate_settings,
+    init_autoresearch_dir,
     link_agent_defaults,
 )
 from autoresearch.marker import (
@@ -78,6 +79,16 @@ class TestGenerateSettings:
         # No Edit denials (only destructive bash)
         edit_denials = [d for d in settings["permissions"]["deny"] if d.startswith("Edit(")]
         assert edit_denials == []
+
+    def test_disallowed_tool_not_in_default_deny_is_appended(self):
+        # Bash(curl:*) is already in the default deny list so the append path
+        # is never reached. Use a tool NOT in the default deny list.
+        marker = _make_marker(agent=AgentConfig(
+            allowed_tools=[],
+            disallowed_tools=["Bash(docker:*)"],
+        ))
+        settings = generate_settings(marker)
+        assert "Bash(docker:*)" in settings["permissions"]["deny"]
 
 
 class TestGenerateClaudeMd:
@@ -157,6 +168,42 @@ class TestEnsureAgentDir:
         # Default agent should NOT get symlinks
         symlinks = [f for f in paths.agent_dir.rglob("*") if f.is_symlink()]
         assert symlinks == []
+
+
+class TestInitAutoresearchDir:
+    def test_creates_autoresearch_directory(self, tmp_path):
+        ar_dir = init_autoresearch_dir(tmp_path)
+        assert ar_dir.is_dir()
+        assert ar_dir == tmp_path / ".autoresearch"
+
+    def test_copies_default_agent_files(self, tmp_path):
+        ar_dir = init_autoresearch_dir(tmp_path)
+        default_dst = ar_dir / "agents" / "default"
+        assert default_dst.is_dir()
+        # At least CLAUDE.md should be copied
+        assert (default_dst / "CLAUDE.md").is_file()
+
+    def test_additive_does_not_overwrite_existing(self, tmp_path):
+        ar_dir = init_autoresearch_dir(tmp_path)
+        claude_md = ar_dir / "agents" / "default" / "CLAUDE.md"
+        original_content = claude_md.read_text()
+        claude_md.write_text("custom override")
+        # Run again — should NOT overwrite
+        init_autoresearch_dir(tmp_path)
+        assert claude_md.read_text() == "custom override"
+
+    def test_symlinks_custom_agents(self, tmp_path):
+        # Create a custom agent directory before calling init
+        custom_agent = tmp_path / ".autoresearch" / "agents" / "custom"
+        custom_agent.mkdir(parents=True, exist_ok=True)
+        ar_dir = init_autoresearch_dir(tmp_path)
+        # Custom agent should get symlinks from default
+        symlinks = [f for f in custom_agent.rglob("*") if f.is_symlink()]
+        assert len(symlinks) > 0
+
+    def test_returns_autoresearch_path(self, tmp_path):
+        result = init_autoresearch_dir(tmp_path)
+        assert result == tmp_path / ".autoresearch"
 
 
 class TestLinkAgentDefaults:

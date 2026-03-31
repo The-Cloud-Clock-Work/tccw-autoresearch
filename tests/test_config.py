@@ -56,3 +56,53 @@ class TestEnsureDir:
         result = ensure_autoresearch_dir()
         assert result == fake_dir
         assert fake_dir.is_dir()
+
+    def test_idempotent(self, tmp_path, monkeypatch):
+        fake_dir = tmp_path / ".autoresearch"
+        monkeypatch.setattr("autoresearch.config.AUTORESEARCH_DIR", fake_dir)
+        ensure_autoresearch_dir()
+        ensure_autoresearch_dir()
+        assert fake_dir.is_dir()
+
+
+class TestConfigDefaults:
+    def test_defaults_config_defaults(self):
+        d = DefaultsConfig()
+        assert d.model == "sonnet"
+        assert d.budget_per_experiment == "10m"
+        assert d.max_experiments == 50
+        assert d.direction == "higher"
+
+    def test_daemon_config_defaults(self):
+        d = DaemonConfig()
+        assert d.poll_interval == "60s"
+        assert d.max_concurrent == 2
+        assert d.log_level == "info"
+
+    def test_global_config_has_both_sections(self):
+        g = GlobalConfig()
+        assert isinstance(g.defaults, DefaultsConfig)
+        assert isinstance(g.daemon, DaemonConfig)
+
+
+class TestLoadConfigExtra:
+    def test_partial_config_fills_defaults(self, tmp_path):
+        cfg_path = tmp_path / "config.yaml"
+        cfg_path.write_text("defaults:\n  model: haiku\n")
+        config = load_config(cfg_path)
+        assert config.defaults.model == "haiku"
+        assert config.defaults.max_experiments == 50  # default
+        assert config.daemon.poll_interval == "60s"  # default
+
+    def test_daemon_section_only(self, tmp_path):
+        cfg_path = tmp_path / "config.yaml"
+        cfg_path.write_text("daemon:\n  max_concurrent: 4\n")
+        config = load_config(cfg_path)
+        assert config.daemon.max_concurrent == 4
+        assert config.defaults.model == "sonnet"  # default
+
+    def test_save_creates_nested_dirs(self, tmp_path):
+        cfg_path = tmp_path / "deep" / "nested" / "config.yaml"
+        config = GlobalConfig()
+        save_config(config, cfg_path)
+        assert cfg_path.is_file()

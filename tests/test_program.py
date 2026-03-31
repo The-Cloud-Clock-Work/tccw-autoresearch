@@ -188,3 +188,41 @@ class TestFormatHelpers:
     def test_ideas_section_empty(self):
         assert _format_ideas_section("") == ""
         assert _format_ideas_section("   \n  ") == ""
+
+    def test_results_section_exactly_20_not_truncated(self):
+        lines = "\n".join(f"line{i}" for i in range(20))
+        result = _format_results_section(lines)
+        assert "last 20" not in result
+        for i in range(20):
+            assert f"line{i}" in result
+
+    def test_results_section_over_20_truncated(self):
+        lines = "\n".join(f"line{i}" for i in range(21))
+        result = _format_results_section(lines)
+        assert "last 20" in result
+        assert "line0" not in result  # first entry dropped
+        assert "line20" in result  # last entry kept
+
+    def test_ideas_section_with_content(self):
+        result = _format_ideas_section("## Near-Misses\n- something\n")
+        assert "Ideas Backlog" in result
+        assert "Near-Misses" in result
+
+    def test_generate_no_mutable_files(self):
+        from autoresearch.marker import Target, Metric, MetricDirection
+        marker = _make_marker(target=Target(mutable=[], immutable=[]))
+        result = generate_program(marker, None, "", "")
+        assert "(none)" in result
+
+    def test_generate_with_ideas(self):
+        result = generate_program(_make_marker(), 30.0, "summary", "## Near-Misses\n- idea\n")
+        assert "Ideas Backlog" in result
+        assert "- idea" in result
+
+    def test_generate_lower_direction(self):
+        from autoresearch.marker import Metric, MetricDirection
+        marker = _make_marker(
+            metric=_make_marker().metric.model_copy(update={"direction": MetricDirection.LOWER})
+        )
+        result = generate_program(marker, 5.0, "", "")
+        assert "lower" in result

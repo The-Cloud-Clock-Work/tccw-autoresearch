@@ -1,5 +1,6 @@
 """Tests for metrics.py — harness execution and confidence scoring."""
 
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -83,6 +84,24 @@ class TestRunHarness:
         )
         assert result.metric == 87.5
 
+    def test_timeout_with_bytes_stdout_stderr(self, work_dir):
+        """TimeoutExpired with bytes stdout/stderr triggers decode path (lines 70, 72)."""
+        exc = subprocess.TimeoutExpired(cmd=["bash", "-c", "sleep"], timeout=1)
+        exc.stdout = b"partial bytes output"
+        exc.stderr = b"partial bytes error"
+
+        with patch("autoresearch.metrics.subprocess.run", side_effect=exc):
+            result = run_harness(
+                command="sleep 10",
+                extract="cat",
+                worktree_path=work_dir,
+                marker_name="test-marker",
+            )
+        assert result.exit_code == -1
+        assert result.metric is None
+        log = work_dir / ".autoresearch" / "test-marker" / "run.log"
+        assert "partial bytes output" in log.read_text()
+
 
 class TestRunGuard:
     def test_exit_code_pass(self, work_dir):
@@ -132,6 +151,17 @@ class TestRunGuard:
             timeout_seconds=1,
         )
         assert result.passed is False
+
+    def test_extract_returns_none_when_no_number_found(self, work_dir):
+        """run_guard returns failed when extract+threshold given but value is None (line 121)."""
+        result = run_guard(
+            command='echo "no numeric value here"',
+            extract=r"grep -oP '\d+(?= passed)'",
+            threshold=5.0,
+            worktree_path=work_dir,
+        )
+        assert result.passed is False
+        assert result.value is None
 
 
 class TestIsImproved:
@@ -226,3 +256,101 @@ class TestExtractMetricEdgeCases:
             marker_name="test-marker",
         )
         assert result.metric == 0.75
+
+    def test_extract_nonnumeric_text_returns_none(self, work_dir):
+        """Extract returns non-empty text with no numbers → metric is None (lines 148-149)."""
+        result = run_harness(
+            command='echo "hello world"',
+            extract="sed 's/[0-9]//g'",
+            worktree_path=work_dir,
+            marker_name="test-marker",
+        )
+        assert result.metric is None
+
+    def test_nonzero_exit_code_still_extracts(self, work_dir):
+        """Non-zero exit code still extracts metric from output."""
+        result = run_harness(
+            command='echo "42 passed"; exit 1',
+            extract=r"grep -oP '\d+(?= passed)'",
+            worktree_path=work_dir,
+            marker_name="test-marker",
+        )
+        assert result.exit_code == 1
+        assert result.metric == 42.0
+
+    def test_stderr_included_in_extraction(self, work_dir):
+        """stderr is combined with stdout for metric extraction."""
+        result = run_harness(
+            command='echo "99 passed" >&2',
+            extract=r"grep -oP '\d+(?= passed)'",
+            worktree_path=work_dir,
+            marker_name="test-marker",
+        )
+        assert result.metric == 99.0
+
+    def test_empty_command_output(self, work_dir):
+        """Empty output → metric is None."""
+        result = run_harness(
+            command="true",
+            extract=r"grep -oP '\d+(?= passed)'",
+            worktree_path=work_dir,
+            marker_name="test-marker",
+        )
+        assert result.metric is None
+
+    def test_log_contains_both_stdout_stderr(self, work_dir):
+        """run.log combines stdout and stderr."""
+        run_harness(
+            command='echo "OUT"; echo "ERR" >&2',
+            extract="cat",
+            worktree_path=work_dir,
+            marker_name="test-marker",
+        )
+        log = work_dir / ".autoresearch" / "test-marker" / "run.log"
+        content = log.read_text()
+        assert "OUT" in content
+        assert "ERR" in content
+
+
+class TestRunGuardExtraEdgeCases:
+    def test_threshold_exact_equal_passes(self, work_dir):
+        """Guard passes when value equals threshold exactly."""
+        result = run_guard(
+            command='echo "25 passed"',
+            extract=r"grep -oP '\d+(?= passed)'",
+            threshold=25.0,
+            worktree_path=work_dir,
+        )
+        assert result.passed is True
+        assert result.value == 25.0
+
+    def test_output_captured_on_pass(self, work_dir):
+        result = run_guard(
+            command='echo "hello from guard"',
+            extract=None,
+            threshold=None,
+            worktree_path=work_dir,
+        )
+        assert "hello from guard" in result.output
+
+    def test_extract_no_threshold_uses_exit_code(self, work_dir):
+        """extract set but threshold is None → falls back to exit code."""
+        result = run_guard(
+            command='echo "50 passed"; exit 0',
+            extract=r"grep -oP '\d+(?= passed)'",
+            threshold=None,
+            worktree_path=work_dir,
+        )
+        assert result.passed is True
+
+
+class TestComputeConfidenceExtra:
+    def test_five_samples(self):
+        kept = [10.0, 12.0, 14.0, 16.0, 18.0]
+        result = compute_confidence(kept, 10.0, 18.0)
+        assert result is not None
+        assert result > 0
+
+    def test_exactly_three_samples(self):
+        result = compute_confidence([10.0, 20.0, 30.0], 10.0, 30.0)
+        assert result is not None
