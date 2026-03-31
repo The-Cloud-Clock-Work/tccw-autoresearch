@@ -30,27 +30,18 @@ $target_line
 A marginal improvement that adds complexity? Probably discard.
 An equal result with less code? Definitely keep.
 
-## Loop
+## Your Task (ONE experiment)
 1. Read current code and results history below
 2. Propose a hypothesis (what to change and why)
-3. Edit target files
-4. git commit with descriptive message
-5. Run metric harness: $metric_command > run.log 2>&1
-6. Extract result
-7. If empty --> crash --> tail -n 50 run.log --> attempt fix or discard
-8. Log to results.tsv
-9. If improved --> KEEP (branch advances)
-10. If equal or worse --> DISCARD (git reset --hard)
-11. REPEAT -- NEVER STOP, NEVER ASK HUMAN
+3. Edit target files to implement your hypothesis
+4. git commit with a descriptive message
+5. EXIT — you are done. The engine will run the metric harness and decide keep/discard.
 
-## Crash Handling
-- Typo/syntax --> fix and retry (same experiment)
-- Fundamental failure --> discard, log "crash", move on
-- 3 consecutive crashes --> simplify back to last known good
+IMPORTANT: Do NOT run the metric harness yourself. Do NOT loop. Make your changes, commit, and exit.
+The engine calls you once per experiment. Make it count.
 
 ## Time Budget
-Each experiment must complete within $budget.
-If exceeded --> kill, treat as crash, discard.
+You have $budget to make your changes. Be focused and efficient.
 
 $escalation_section\
 $results_section\
