@@ -1,4 +1,4 @@
-# tccw-autoresearch
+# The Cloud Clock Work Autoresearch
 
 **Agnostic autonomous improvement engine.** Point it at any codebase — it makes it measurably better overnight while you sleep.
 
