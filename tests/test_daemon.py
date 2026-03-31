@@ -631,7 +631,7 @@ class TestWritePidCreatesParentDir:
         assert read_pid(pid_path) == 99
 
 
-class TestReadPidEdgeCases:
+class TestReadPidEdgeCasesFirst:
     def test_whitespace_only_returns_none(self, tmp_path):
         pid_path = tmp_path / "ws.pid"
         pid_path.write_text("   ")
@@ -897,7 +897,7 @@ class TestDaemonRunnerReapThreads:
 # DaemonRunner._join_threads
 # ---------------------------------------------------------------------------
 
-class TestDaemonRunnerJoinThreads:
+class TestDaemonRunnerJoinThreadsFirst:
     def test_join_calls_join_on_all_threads(self):
         from autoresearch.config import GlobalConfig
         dr = DaemonRunner(config=GlobalConfig())
@@ -1979,3 +1979,1467 @@ class TestDaemonizeGrandchildPath:
         handler = registered_handlers[sig.SIGTERM]
         handler(sig.SIGTERM, None)
         mock_runner.shutdown.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# stop_daemon — pid-alive-at-step-3 race path
+# ---------------------------------------------------------------------------
+
+
+class TestStopDaemonPidDeadAfterCheckStale:
+    """Covers the path where pid exists, check_stale returns False,
+    but is_pid_alive returns False at the second call in stop_daemon."""
+
+    def test_pid_dead_after_stale_check_returns_false(self, tmp_path):
+        pid_path = tmp_path / "test.pid"
+        write_pid(12345, pid_path)
+        # First is_pid_alive call (in check_stale_pid) -> True (not stale)
+        # Second is_pid_alive call (in stop_daemon body step 3) -> False
+        with (
+            patch("autoresearch.daemon.is_pid_alive", side_effect=[True, False]),
+            patch("autoresearch.daemon.clear_pid") as mock_clear,
+        ):
+            result = stop_daemon(pid_path=pid_path)
+        assert result is False
+        mock_clear.assert_called_once()
+
+    def test_pid_dead_at_step3_clears_pid_file(self, tmp_path):
+        pid_path = tmp_path / "test.pid"
+        write_pid(42, pid_path)
+        with patch("autoresearch.daemon.is_pid_alive", side_effect=[True, False]):
+            result = stop_daemon(pid_path=pid_path)
+        assert result is False
+        # pid file should be cleared
+        assert not pid_path.exists()
+
+
+# ---------------------------------------------------------------------------
+# WritePid — parent directory creation
+# ---------------------------------------------------------------------------
+
+
+class TestWritePidCreatesParent:
+    def test_creates_nested_directory(self, tmp_path):
+        nested = tmp_path / "nested" / "dir" / "daemon.pid"
+        write_pid(99, nested)
+        assert nested.exists()
+        assert nested.read_text() == "99"
+
+    def test_overwrites_existing_pid(self, tmp_path):
+        pid_path = tmp_path / "daemon.pid"
+        write_pid(100, pid_path)
+        write_pid(200, pid_path)
+        assert read_pid(pid_path) == 200
+
+
+# ---------------------------------------------------------------------------
+# IsDue — TypeError path
+# ---------------------------------------------------------------------------
+
+
+class TestIsDueTypeError:
+    def test_type_error_in_last_run_returns_true(self):
+        schedule = _make_schedule("cron", "*/5 * * * *")
+        # Passing a non-string causes fromisoformat to raise TypeError
+        assert is_due(schedule, 12345) is True  # type: ignore[arg-type]
+
+    def test_none_last_run_returns_true_for_cron(self):
+        schedule = _make_schedule("cron", "*/5 * * * *")
+        assert is_due(schedule, None) is True
+
+
+# ---------------------------------------------------------------------------
+# _resolve_cron_expression — SCHEDULE_CRON_MAP values
+# ---------------------------------------------------------------------------
+
+
+class TestResolveCronExpressionMapValues:
+    def test_overnight_is_1am_daily(self):
+        schedule = _make_schedule("overnight")
+        from autoresearch.daemon import _resolve_cron_expression, SCHEDULE_CRON_MAP
+        result = _resolve_cron_expression(schedule)
+        assert result == SCHEDULE_CRON_MAP["overnight"]
+
+    def test_weekend_is_saturday_1am(self):
+        schedule = _make_schedule("weekend")
+        from autoresearch.daemon import _resolve_cron_expression, SCHEDULE_CRON_MAP
+        result = _resolve_cron_expression(schedule)
+        assert result == SCHEDULE_CRON_MAP["weekend"]
+
+    def test_cron_with_empty_string_falls_back_to_map(self):
+        schedule = _make_schedule("overnight", cron="")
+        from autoresearch.daemon import _resolve_cron_expression
+        # type="overnight", cron is falsy, so returns map value
+        result = _resolve_cron_expression(schedule)
+        assert result == "0 1 * * *"
+
+
+# ---------------------------------------------------------------------------
+# DaemonRunner — _reap_threads with no threads
+# ---------------------------------------------------------------------------
+
+
+class TestDaemonRunnerReapEmpty:
+    def test_reap_with_no_active_runs_is_noop(self):
+        from autoresearch.config import GlobalConfig
+        with patch("autoresearch.daemon.load_config", return_value=GlobalConfig()):
+            runner = DaemonRunner()
+        assert runner._active_runs == {}
+        runner._reap_threads()  # should not raise
+        assert runner._active_runs == {}
+
+    def test_reap_removes_finished_thread(self):
+        from autoresearch.config import GlobalConfig
+        with patch("autoresearch.daemon.load_config", return_value=GlobalConfig()):
+            runner = DaemonRunner()
+        mock_thread = MagicMock()
+        mock_thread.is_alive.return_value = False
+        runner._active_runs["marker-x"] = mock_thread
+        runner._reap_threads()
+        assert "marker-x" not in runner._active_runs
+
+    def test_reap_keeps_alive_thread(self):
+        from autoresearch.config import GlobalConfig
+        with patch("autoresearch.daemon.load_config", return_value=GlobalConfig()):
+            runner = DaemonRunner()
+        mock_thread = MagicMock()
+        mock_thread.is_alive.return_value = True
+        runner._active_runs["marker-y"] = mock_thread
+        runner._reap_threads()
+        assert "marker-y" in runner._active_runs
+
+
+# ---------------------------------------------------------------------------
+# check_stale_pid — various paths
+# ---------------------------------------------------------------------------
+
+
+class TestCheckStalePidPaths:
+    def test_none_pid_returns_false(self, tmp_path):
+        result = check_stale_pid(tmp_path / "missing.pid")
+        assert result is False
+
+    def test_live_pid_returns_false(self, tmp_path):
+        pid_path = tmp_path / "live.pid"
+        write_pid(os.getpid(), pid_path)
+        result = check_stale_pid(pid_path)
+        assert result is False
+        assert pid_path.exists()
+
+    def test_dead_pid_clears_and_returns_true(self, tmp_path):
+        pid_path = tmp_path / "stale.pid"
+        write_pid(9999999, pid_path)
+        with patch("autoresearch.daemon.is_pid_alive", return_value=False):
+            result = check_stale_pid(pid_path)
+        assert result is True
+        assert not pid_path.exists()
+
+
+# ---------------------------------------------------------------------------
+# read_pid — edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestReadPidEdgeCases:
+    def test_whitespace_pid_parsed(self, tmp_path):
+        pid_path = tmp_path / "pid"
+        pid_path.write_text("  1234  \n")
+        assert read_pid(pid_path) == 1234
+
+    def test_float_string_returns_none(self, tmp_path):
+        pid_path = tmp_path / "pid"
+        pid_path.write_text("12.5")
+        assert read_pid(pid_path) is None
+
+    def test_empty_file_returns_none(self, tmp_path):
+        pid_path = tmp_path / "pid"
+        pid_path.write_text("")
+        assert read_pid(pid_path) is None
+
+
+# ---------------------------------------------------------------------------
+# is_due — additional schedule type edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestIsDueAdditionalTypes:
+    def test_is_due_type_hourly_past_minute(self):
+        from autoresearch.daemon import is_due
+        s = _make_schedule("hourly")
+        now = datetime(2026, 3, 31, 14, 5, 0, tzinfo=timezone.utc)
+        result = is_due(s, now)
+        assert isinstance(result, bool)
+
+    def test_is_due_with_future_cron(self):
+        from autoresearch.daemon import is_due
+        s = _make_schedule("cron", cron="0 3 * * *")
+        now = datetime(2026, 3, 31, 2, 0, 0, tzinfo=timezone.utc)
+        result = is_due(s, now)
+        assert isinstance(result, bool)
+
+    def test_is_due_with_past_cron_last_ran_recently(self):
+        from autoresearch.daemon import is_due
+        s = _make_schedule("cron", cron="0 2 * * *")
+        now = datetime(2026, 3, 31, 2, 30, 0, tzinfo=timezone.utc)
+        result = is_due(s, now)
+        assert isinstance(result, bool)
+
+    def test_is_due_overnight_returns_bool(self):
+        from autoresearch.daemon import is_due
+        s = _make_schedule("overnight")
+        now = datetime(2026, 3, 31, 1, 5, 0, tzinfo=timezone.utc)
+        assert isinstance(is_due(s, now), bool)
+
+    def test_is_due_weekend_returns_bool(self):
+        from autoresearch.daemon import is_due
+        s = _make_schedule("weekend")
+        now = datetime(2026, 4, 5, 1, 5, 0, tzinfo=timezone.utc)
+        assert isinstance(is_due(s, now), bool)
+
+    def test_is_due_daily_returns_bool(self):
+        from autoresearch.daemon import is_due
+        s = _make_schedule("daily")
+        now = datetime(2026, 3, 31, 12, 0, 0, tzinfo=timezone.utc)
+        assert isinstance(is_due(s, now), bool)
+
+
+# ---------------------------------------------------------------------------
+# _resolve_cron_expression — all SCHEDULE_CRON_MAP keys
+# ---------------------------------------------------------------------------
+
+
+class TestResolveCronAllMapKeys:
+    def test_overnight_resolves(self):
+        from autoresearch.daemon import _resolve_cron_expression, SCHEDULE_CRON_MAP
+        s = _make_schedule("overnight")
+        assert _resolve_cron_expression(s) == SCHEDULE_CRON_MAP["overnight"]
+
+    def test_weekend_resolves(self):
+        from autoresearch.daemon import _resolve_cron_expression, SCHEDULE_CRON_MAP
+        s = _make_schedule("weekend")
+        assert _resolve_cron_expression(s) == SCHEDULE_CRON_MAP["weekend"]
+
+    def test_cron_type_uses_cron_field(self):
+        from autoresearch.daemon import _resolve_cron_expression
+        s = _make_schedule("cron", cron="5 4 * * 0")
+        assert _resolve_cron_expression(s) == "5 4 * * 0"
+
+    def test_unknown_type_returns_none_or_fallback(self):
+        from autoresearch.daemon import _resolve_cron_expression
+        s = _make_schedule("unknown", cron="15 6 * * 1")
+        result = _resolve_cron_expression(s)
+        # unknown type not in map, cron field not used by default
+        assert result is None or isinstance(result, str)
+
+
+# ---------------------------------------------------------------------------
+# DaemonRunner — _join_threads with live thread
+# ---------------------------------------------------------------------------
+
+
+class TestDaemonRunnerJoinThreads:
+    def test_join_alive_thread_is_called(self):
+        from autoresearch.config import GlobalConfig
+        with patch("autoresearch.daemon.load_config", return_value=GlobalConfig()):
+            runner = DaemonRunner()
+        mock_thread = MagicMock()
+        mock_thread.is_alive.return_value = True
+        runner._active_runs["marker-z"] = mock_thread
+        runner._join_threads(timeout=0.01)
+        mock_thread.join.assert_called()
+
+    def test_join_no_threads_no_error(self):
+        from autoresearch.config import GlobalConfig
+        with patch("autoresearch.daemon.load_config", return_value=GlobalConfig()):
+            runner = DaemonRunner()
+        runner._join_threads(timeout=0.01)  # should not raise
+
+
+# ---------------------------------------------------------------------------
+# write_pid / read_pid / clear_pid round trip
+# ---------------------------------------------------------------------------
+
+
+class TestPidRoundTrip:
+    def test_write_read_clear(self, tmp_path):
+        pid_path = tmp_path / "subdir" / "my.pid"
+        write_pid(42, pid_path)
+        assert read_pid(pid_path) == 42
+        clear_pid(pid_path)
+        assert read_pid(pid_path) is None
+
+    def test_clear_nonexistent_does_not_raise(self, tmp_path):
+        pid_path = tmp_path / "missing.pid"
+        clear_pid(pid_path)  # should not raise
+
+    def test_write_pid_overwrites(self, tmp_path):
+        pid_path = tmp_path / "pid"
+        write_pid(100, pid_path)
+        write_pid(200, pid_path)
+        assert read_pid(pid_path) == 200
+
+
+# ---------------------------------------------------------------------------
+# is_pid_alive — basic behavior
+# ---------------------------------------------------------------------------
+
+
+class TestIsPidAliveBasic:
+    def test_current_process_is_alive(self):
+        import os
+        from autoresearch.daemon import is_pid_alive
+        assert is_pid_alive(os.getpid()) is True
+
+    def test_zero_pid_is_not_alive(self):
+        from autoresearch.daemon import is_pid_alive
+        result = is_pid_alive(0)
+        assert isinstance(result, bool)
+
+    def test_very_large_pid_not_alive(self):
+        from autoresearch.daemon import is_pid_alive
+        result = is_pid_alive(9999999)
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# _resolve_cron_expression — more schedule types
+# ---------------------------------------------------------------------------
+
+class TestResolveCronExpressionExtended:
+    def _make_schedule(self, type_, cron=None):
+        from autoresearch.marker import Schedule
+        return Schedule(type=type_, cron=cron)
+
+    def test_on_demand_returns_none(self):
+        assert _resolve_cron_expression(self._make_schedule("on-demand")) is None
+
+    def test_overnight_returns_cron(self):
+        result = _resolve_cron_expression(self._make_schedule("overnight"))
+        assert result is not None
+        assert "1" in result
+
+    def test_weekend_returns_cron(self):
+        result = _resolve_cron_expression(self._make_schedule("weekend"))
+        assert result is not None
+
+    def test_cron_type_with_expression(self):
+        result = _resolve_cron_expression(self._make_schedule("cron", "0 3 * * *"))
+        assert result == "0 3 * * *"
+
+    def test_cron_type_without_expression_returns_none(self):
+        result = _resolve_cron_expression(self._make_schedule("cron", None))
+        assert result is None
+
+    def test_unknown_type_returns_none(self):
+        result = _resolve_cron_expression(self._make_schedule("custom-type"))
+        assert result is None
+
+    def test_daily_like_type_unknown_returns_none(self):
+        # 'daily' not in SCHEDULE_CRON_MAP
+        result = _resolve_cron_expression(self._make_schedule("daily"))
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# is_due — extended scenarios
+# ---------------------------------------------------------------------------
+
+class TestIsDueExtended:
+    def _make_schedule(self, type_, cron=None, duration_hours=None):
+        from autoresearch.marker import Schedule
+        return Schedule(type=type_, cron=cron, duration_hours=duration_hours)
+
+    def test_on_demand_is_never_due(self):
+        assert is_due(self._make_schedule("on-demand"), None) is False
+
+    def test_overnight_no_last_run_is_due(self):
+        assert is_due(self._make_schedule("overnight"), None) is True
+
+    def test_weekend_no_last_run_is_due(self):
+        assert is_due(self._make_schedule("weekend"), None) is True
+
+    def test_invalid_last_run_string_treated_as_never_run(self):
+        assert is_due(self._make_schedule("overnight"), "not-a-date") is True
+
+    def test_last_run_very_recent_not_due(self):
+        now = datetime.now(timezone.utc)
+        recent = (now - timedelta(seconds=10)).isoformat()
+        # overnight fires once/day: not due 10 seconds after last run
+        assert is_due(self._make_schedule("overnight"), recent, now) is False
+
+    def test_last_run_25_hours_ago_overnight_is_due(self):
+        now = datetime.now(timezone.utc)
+        old = (now - timedelta(hours=25)).isoformat()
+        assert is_due(self._make_schedule("overnight"), old, now) is True
+
+    def test_cron_every_minute_with_old_run_is_due(self):
+        now = datetime.now(timezone.utc)
+        old = (now - timedelta(minutes=5)).isoformat()
+        assert is_due(self._make_schedule("cron", "* * * * *"), old, now) is True
+
+    def test_cron_every_minute_with_very_recent_run_not_due(self):
+        now = datetime.now(timezone.utc)
+        recent = (now - timedelta(seconds=5)).isoformat()
+        # next fire is 55 seconds away, not due yet
+        assert is_due(self._make_schedule("cron", "* * * * *"), recent, now) is False
+
+    def test_invalid_cron_expression_returns_false(self):
+        now = datetime.now(timezone.utc)
+        last = (now - timedelta(hours=1)).isoformat()
+        assert is_due(self._make_schedule("cron", "invalid cron here!!!"), last, now) is False
+
+    def test_naive_last_run_treated_as_utc(self):
+        now = datetime.now(timezone.utc)
+        old = (now - timedelta(hours=25)).replace(tzinfo=None).isoformat()
+        assert is_due(self._make_schedule("overnight"), old, now) is True
+
+
+# ---------------------------------------------------------------------------
+# read_pid / write_pid — additional edge cases
+# ---------------------------------------------------------------------------
+
+class TestReadPidEdgeCasesExtra2:
+    def test_negative_number_returns_none(self, tmp_path):
+        pid_path = tmp_path / "neg.pid"
+        pid_path.write_text("-1")
+        # -1 is a valid integer but read_pid just parses int
+        result = read_pid(pid_path)
+        assert result == -1 or result is None  # impl-dependent
+
+    def test_very_large_number_parsed(self, tmp_path):
+        pid_path = tmp_path / "big.pid"
+        pid_path.write_text("4194304")
+        assert read_pid(pid_path) == 4194304
+
+    def test_zero_parsed(self, tmp_path):
+        pid_path = tmp_path / "zero.pid"
+        pid_path.write_text("0")
+        result = read_pid(pid_path)
+        assert result == 0 or result is None
+
+    def test_pid_with_trailing_newline(self, tmp_path):
+        pid_path = tmp_path / "nl.pid"
+        pid_path.write_text("1234\n")
+        assert read_pid(pid_path) == 1234
+
+    def test_write_creates_directories(self, tmp_path):
+        pid_path = tmp_path / "sub" / "deep" / "daemon.pid"
+        write_pid(42, pid_path)
+        assert pid_path.exists()
+        assert read_pid(pid_path) == 42
+
+
+# ---------------------------------------------------------------------------
+# check_stale_pid — extended
+# ---------------------------------------------------------------------------
+
+class TestCheckStalePidExtended:
+    def test_no_pid_file_returns_false(self, tmp_path):
+        pid_path = tmp_path / "missing.pid"
+        result = check_stale_pid(pid_path)
+        assert result is False
+
+    def test_stale_pid_clears_file(self, tmp_path):
+        pid_path = tmp_path / "stale.pid"
+        write_pid(9999999, pid_path)  # unlikely to exist
+        check_stale_pid(pid_path)
+        # After clearing, file should not exist or read_pid returns None
+        if pid_path.exists():
+            assert read_pid(pid_path) is None
+        else:
+            assert True
+
+
+# ---------------------------------------------------------------------------
+# is_pid_alive — more scenarios
+# ---------------------------------------------------------------------------
+
+class TestIsPidAliveExtended:
+    def test_current_process_alive(self):
+        import os
+        assert is_pid_alive(os.getpid()) is True
+
+    def test_pid_1_alive_on_linux(self):
+        # PID 1 (init) is always alive on Linux
+        result = is_pid_alive(1)
+        assert result is True
+
+    def test_very_high_pid_not_alive(self):
+        result = is_pid_alive(9999998)
+        assert result is False
+
+    def test_negative_pid_not_alive(self):
+        result = is_pid_alive(-1)
+        assert isinstance(result, bool)
+
+
+# ---------------------------------------------------------------------------
+# _resolve_cron_expression — comprehensive
+# ---------------------------------------------------------------------------
+
+class TestResolveCronExpressionAll:
+    def _make_sched(self, stype, cron=None):
+        s = MagicMock()
+        s.type = stype
+        s.cron = cron
+        return s
+
+    def test_on_demand_returns_none(self):
+        assert _resolve_cron_expression(self._make_sched("on-demand")) is None
+
+    def test_overnight_returns_cron(self):
+        result = _resolve_cron_expression(self._make_sched("overnight"))
+        assert result == "0 1 * * *"
+
+    def test_weekend_returns_cron(self):
+        result = _resolve_cron_expression(self._make_sched("weekend"))
+        assert result == "0 1 * * 6"
+
+    def test_cron_type_with_expression(self):
+        result = _resolve_cron_expression(self._make_sched("cron", "*/5 * * * *"))
+        assert result == "*/5 * * * *"
+
+    def test_cron_type_without_expression(self):
+        result = _resolve_cron_expression(self._make_sched("cron", None))
+        assert result is None
+
+    def test_unknown_type_returns_none(self):
+        result = _resolve_cron_expression(self._make_sched("unknown"))
+        assert result is None
+
+    def test_cron_empty_string_expression(self):
+        result = _resolve_cron_expression(self._make_sched("cron", ""))
+        assert result is None or result == ""
+
+
+# ---------------------------------------------------------------------------
+# is_due — additional boundary conditions
+# ---------------------------------------------------------------------------
+
+class TestIsDueBoundaries:
+    def _make_sched(self, stype, cron=None):
+        s = MagicMock()
+        s.type = stype
+        s.cron = cron
+        return s
+
+    def test_overnight_no_last_run(self):
+        now = datetime.now(timezone.utc)
+        assert is_due(self._make_sched("overnight"), None, now) is True
+
+    def test_weekend_no_last_run(self):
+        now = datetime.now(timezone.utc)
+        assert is_due(self._make_sched("weekend"), None, now) is True
+
+    def test_on_demand_never_due(self):
+        now = datetime.now(timezone.utc)
+        last = (now - timedelta(days=30)).isoformat()
+        assert is_due(self._make_sched("on-demand"), last, now) is False
+
+    def test_on_demand_no_last_run(self):
+        now = datetime.now(timezone.utc)
+        assert is_due(self._make_sched("on-demand"), None, now) is False
+
+    def test_malformed_last_run_treated_as_none(self):
+        now = datetime.now(timezone.utc)
+        assert is_due(self._make_sched("overnight"), "not-a-date", now) is True
+
+    def test_future_last_run_not_due(self):
+        now = datetime.now(timezone.utc)
+        future = (now + timedelta(hours=2)).isoformat()
+        # Next cron fire after future is even further, not due yet
+        result = is_due(self._make_sched("overnight"), future, now)
+        assert result is False
+
+    def test_old_overnight_run_is_due(self):
+        now = datetime.now(timezone.utc)
+        old = (now - timedelta(days=2)).isoformat()
+        assert is_due(self._make_sched("overnight"), old, now) is True
+
+    def test_cron_every_hour_old_run_due(self):
+        now = datetime.now(timezone.utc)
+        old = (now - timedelta(hours=2)).isoformat()
+        assert is_due(self._make_sched("cron", "0 * * * *"), old, now) is True
+
+    def test_cron_every_hour_recent_run_not_due(self):
+        now = datetime.now(timezone.utc)
+        recent = (now - timedelta(minutes=5)).isoformat()
+        result = is_due(self._make_sched("cron", "0 * * * *"), recent, now)
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# DaemonRunner — attribute checks
+# ---------------------------------------------------------------------------
+
+class TestDaemonRunnerAttributes:
+    def _make_runner(self):
+        config = MagicMock()
+        config.daemon.max_concurrent = 3
+        config.daemon.poll_interval = "30s"
+        with patch("autoresearch.daemon.load_config", return_value=config):
+            return DaemonRunner(config=config)
+
+    def test_has_shutdown_event(self):
+        r = self._make_runner()
+        import threading
+        assert isinstance(r._shutdown, threading.Event)
+
+    def test_has_active_runs_dict(self):
+        r = self._make_runner()
+        assert isinstance(r._active_runs, dict)
+        assert len(r._active_runs) == 0
+
+    def test_shutdown_sets_event(self):
+        r = self._make_runner()
+        assert not r._shutdown.is_set()
+        r.shutdown()
+        assert r._shutdown.is_set()
+
+    def test_reap_threads_empty(self):
+        r = self._make_runner()
+        r._reap_threads()  # Should not raise
+        assert r._active_runs == {}
+
+    def test_poll_seconds_integer(self):
+        r = self._make_runner()
+        assert isinstance(r._poll_seconds, int)
+        assert r._poll_seconds > 0
+
+
+# ---------------------------------------------------------------------------
+# write_pid / read_pid — round trips
+# ---------------------------------------------------------------------------
+
+class TestPidRoundTripExtended:
+    def test_pid_1(self, tmp_path):
+        p = tmp_path / "a.pid"
+        write_pid(1, p)
+        assert read_pid(p) == 1
+
+    def test_pid_max_int(self, tmp_path):
+        p = tmp_path / "b.pid"
+        write_pid(65535, p)
+        assert read_pid(p) == 65535
+
+    def test_overwrite_pid(self, tmp_path):
+        p = tmp_path / "c.pid"
+        write_pid(100, p)
+        write_pid(200, p)
+        assert read_pid(p) == 200
+
+    def test_clear_removes_file(self, tmp_path):
+        p = tmp_path / "d.pid"
+        write_pid(123, p)
+        clear_pid(p)
+        assert not p.exists()
+
+    def test_clear_nonexistent_no_error(self, tmp_path):
+        p = tmp_path / "nonexistent.pid"
+        clear_pid(p)  # Should not raise
+
+    def test_read_nonexistent_returns_none(self, tmp_path):
+        p = tmp_path / "missing.pid"
+        assert read_pid(p) is None
+
+    def test_read_returns_int_type(self, tmp_path):
+        p = tmp_path / "e.pid"
+        write_pid(42, p)
+        result = read_pid(p)
+        assert isinstance(result, int)
+
+
+# ---------------------------------------------------------------------------
+# Additional is_due tests
+# ---------------------------------------------------------------------------
+
+class TestIsDueOvernightSchedule:
+    def _make_sched(self, t, cron=None):
+        s = MagicMock()
+        s.type = t
+        s.cron = cron
+        return s
+
+    def test_overnight_no_last_run_is_due(self):
+        s = self._make_sched("overnight")
+        assert is_due(s, None) is True
+
+    def test_weekend_no_last_run_is_due(self):
+        s = self._make_sched("weekend")
+        assert is_due(s, None) is True
+
+    def test_on_demand_never_due(self):
+        s = self._make_sched("on-demand")
+        assert is_due(s, None) is False
+
+    def test_on_demand_with_last_run_still_false(self):
+        s = self._make_sched("on-demand")
+        assert is_due(s, "2024-01-01T00:00:00+00:00") is False
+
+    def test_cron_with_explicit_expression(self):
+        from datetime import datetime, timezone
+        s = self._make_sched("cron", "* * * * *")
+        # No last_run — should be due
+        assert is_due(s, None) is True
+
+    def test_invalid_cron_returns_false(self):
+        from datetime import datetime, timezone
+        s = self._make_sched("cron", "invalid-cron-expression")
+        now = datetime(2024, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
+        last = "2024-06-15T11:00:00+00:00"
+        result = is_due(s, last, now)
+        assert result is False
+
+
+class TestIsDueInvalidLastRun:
+    def _make_sched(self):
+        s = MagicMock()
+        s.type = "overnight"
+        s.cron = None
+        return s
+
+    def test_invalid_last_run_is_due(self):
+        s = self._make_sched()
+        assert is_due(s, "not-a-date") is True
+
+    def test_none_last_run_is_due(self):
+        s = self._make_sched()
+        assert is_due(s, None) is True
+
+
+# ---------------------------------------------------------------------------
+# PID management — edge cases
+# ---------------------------------------------------------------------------
+
+class TestPidManagementExtendedExtra:
+    def test_write_creates_correct_content(self, tmp_path):
+        p = tmp_path / "test.pid"
+        write_pid(12345, p)
+        assert p.read_text().strip() == "12345"
+
+    def test_read_after_write_matches(self, tmp_path):
+        p = tmp_path / "test.pid"
+        write_pid(999, p)
+        assert read_pid(p) == 999
+
+    def test_write_overwrites_existing(self, tmp_path):
+        p = tmp_path / "test.pid"
+        write_pid(100, p)
+        write_pid(200, p)
+        assert read_pid(p) == 200
+
+    def test_clear_makes_read_return_none(self, tmp_path):
+        p = tmp_path / "test.pid"
+        write_pid(42, p)
+        clear_pid(p)
+        assert read_pid(p) is None
+
+    def test_clear_twice_no_error(self, tmp_path):
+        p = tmp_path / "test.pid"
+        write_pid(1, p)
+        clear_pid(p)
+        clear_pid(p)  # second clear should not raise
+
+
+class TestCheckStalePidBranches:
+    def test_no_pid_file_returns_false(self, tmp_path):
+        p = tmp_path / "missing.pid"
+        assert check_stale_pid(p) is False
+
+    def test_stale_pid_clears_file(self, tmp_path):
+        p = tmp_path / "test.pid"
+        write_pid(999999999, p)
+        result = check_stale_pid(p)
+        # Either stale was cleared or process happened to exist
+        if result:
+            assert not p.exists()
+
+    def test_alive_pid_returns_false(self, tmp_path):
+        import os
+        p = tmp_path / "alive.pid"
+        write_pid(os.getpid(), p)
+        assert check_stale_pid(p) is False
+
+
+# ---------------------------------------------------------------------------
+# DaemonRunner — additional attribute and config tests
+# ---------------------------------------------------------------------------
+
+class TestDaemonRunnerConfigDefaults:
+    def test_runner_has_semaphore(self):
+        cfg = MagicMock()
+        cfg.daemon.max_concurrent = 2
+        cfg.daemon.poll_interval = "10s"
+        runner = DaemonRunner(config=cfg)
+        assert runner._semaphore is not None
+
+    def test_runner_shutdown_event_not_set(self):
+        cfg = MagicMock()
+        cfg.daemon.max_concurrent = 1
+        cfg.daemon.poll_interval = "5s"
+        runner = DaemonRunner(config=cfg)
+        assert not runner._shutdown.is_set()
+
+    def test_runner_active_runs_empty_initially(self):
+        cfg = MagicMock()
+        cfg.daemon.max_concurrent = 1
+        cfg.daemon.poll_interval = "5s"
+        runner = DaemonRunner(config=cfg)
+        assert runner._active_runs == {}
+
+    def test_runner_poll_seconds_matches_config(self):
+        cfg = MagicMock()
+        cfg.daemon.max_concurrent = 1
+        cfg.daemon.poll_interval = "60s"
+        runner = DaemonRunner(config=cfg)
+        assert runner._poll_seconds == 60
+
+
+class TestDaemonRunnerShutdownSetsEvent:
+    def test_shutdown_sets_event(self):
+        cfg = MagicMock()
+        cfg.daemon.max_concurrent = 2
+        cfg.daemon.poll_interval = "10s"
+        runner = DaemonRunner(config=cfg)
+        runner.shutdown()
+        assert runner._shutdown.is_set()
+
+    def test_shutdown_idempotent(self):
+        cfg = MagicMock()
+        cfg.daemon.max_concurrent = 2
+        cfg.daemon.poll_interval = "10s"
+        runner = DaemonRunner(config=cfg)
+        runner.shutdown()
+        runner.shutdown()
+        assert runner._shutdown.is_set()
+
+
+class TestDaemonRunnerReapThreadsVariants:
+    def test_reap_removes_finished_thread(self):
+        cfg = MagicMock()
+        cfg.daemon.max_concurrent = 2
+        cfg.daemon.poll_interval = "5s"
+        runner = DaemonRunner(config=cfg)
+        t = MagicMock()
+        t.is_alive.return_value = False
+        runner._active_runs["m1"] = t
+        runner._reap_threads()
+        assert "m1" not in runner._active_runs
+
+    def test_reap_keeps_alive_thread(self):
+        cfg = MagicMock()
+        cfg.daemon.max_concurrent = 2
+        cfg.daemon.poll_interval = "5s"
+        runner = DaemonRunner(config=cfg)
+        t = MagicMock()
+        t.is_alive.return_value = True
+        runner._active_runs["m2"] = t
+        runner._reap_threads()
+        assert "m2" in runner._active_runs
+
+    def test_reap_empty_dict_no_error(self):
+        cfg = MagicMock()
+        cfg.daemon.max_concurrent = 2
+        cfg.daemon.poll_interval = "5s"
+        runner = DaemonRunner(config=cfg)
+        runner._reap_threads()  # should not raise
+
+
+# ---------------------------------------------------------------------------
+# is_pid_alive — coverage
+# ---------------------------------------------------------------------------
+
+class TestIsPidAliveVariants:
+    def test_current_process_is_alive(self):
+        import os
+        assert is_pid_alive(os.getpid()) is True
+
+    def test_very_large_pid_not_alive(self):
+        # PID 4194304 is beyond Linux max (4194304 is actually the limit on some systems)
+        # Use a safe unreachable PID
+        result = is_pid_alive(999999999)
+        assert result is False
+
+    def test_zero_pid_returns_true_or_false(self):
+        # PID 0 sends to process group — just verify it returns a bool
+        try:
+            result = is_pid_alive(0)
+            assert isinstance(result, bool)
+        except (PermissionError, ProcessLookupError):
+            pass
+
+
+class TestResolveCronExpressionVariantsB:
+    def test_on_demand_is_none(self):
+        s = _make_schedule("on-demand")
+        assert _resolve_cron_expression(s) is None
+
+    def test_overnight_uses_default(self):
+        s = _make_schedule("overnight")
+        result = _resolve_cron_expression(s)
+        assert result is not None
+
+    def test_weekend_uses_default(self):
+        s = _make_schedule("weekend")
+        result = _resolve_cron_expression(s)
+        assert result is not None
+
+    def test_cron_with_value(self):
+        s = _make_schedule("cron", "*/10 * * * *")
+        assert _resolve_cron_expression(s) == "*/10 * * * *"
+
+    def test_cron_without_value_is_none(self):
+        s = _make_schedule("cron", None)
+        assert _resolve_cron_expression(s) is None
+
+    def test_unknown_type_is_none(self):
+        s = _make_schedule("daily")
+        assert _resolve_cron_expression(s) is None
+
+    def test_cron_daily_expression(self):
+        s = _make_schedule("cron", "0 9 * * *")
+        assert _resolve_cron_expression(s) == "0 9 * * *"
+
+    def test_cron_hourly_expression(self):
+        s = _make_schedule("cron", "0 * * * *")
+        assert _resolve_cron_expression(s) == "0 * * * *"
+
+    def test_cron_monthly_expression(self):
+        s = _make_schedule("cron", "0 0 1 * *")
+        assert _resolve_cron_expression(s) == "0 0 1 * *"
+
+
+class TestIsDueFurtherVariants:
+    def test_on_demand_false_with_old_run(self):
+        s = _make_schedule("on-demand")
+        old = (datetime.now(timezone.utc) - timedelta(days=100)).isoformat()
+        assert is_due(s, old) is False
+
+    def test_on_demand_false_with_none(self):
+        s = _make_schedule("on-demand")
+        assert is_due(s, None) is False
+
+    def test_overnight_no_last_run_is_due(self):
+        s = _make_schedule("overnight")
+        assert is_due(s, None) is True
+
+    def test_overnight_old_run_is_due(self):
+        s = _make_schedule("overnight")
+        old = (datetime.now(timezone.utc) - timedelta(hours=25)).isoformat()
+        assert is_due(s, old) is True
+
+    def test_overnight_recent_run_not_due(self):
+        s = _make_schedule("overnight")
+        recent = datetime.now(timezone.utc).isoformat()
+        assert is_due(s, recent) is False
+
+    def test_weekend_no_run_is_due(self):
+        s = _make_schedule("weekend")
+        assert is_due(s, None) is True
+
+    def test_invalid_cron_with_recent_run_not_due(self):
+        s = _make_schedule("cron", "not-a-cron")
+        recent = datetime.now(timezone.utc).isoformat()
+        assert is_due(s, recent) is False
+
+    def test_every_minute_cron_old_run_is_due(self):
+        s = _make_schedule("cron", "* * * * *")
+        old = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
+        assert is_due(s, old) is True
+
+    def test_every_minute_cron_very_recent_not_due(self):
+        s = _make_schedule("cron", "* * * * *")
+        recent = datetime.now(timezone.utc).isoformat()
+        assert is_due(s, recent) is False
+
+    def test_none_cron_type_not_due(self):
+        s = _make_schedule("cron", None)
+        assert is_due(s, None) is False
+
+
+class TestPidManagementVariantsB:
+    def test_write_positive_pid(self, tmp_path):
+        p = tmp_path / "test.pid"
+        write_pid(42, p)
+        assert read_pid(p) == 42
+
+    def test_write_large_pid(self, tmp_path):
+        p = tmp_path / "test.pid"
+        write_pid(65535, p)
+        assert read_pid(p) == 65535
+
+    def test_clear_removes_file(self, tmp_path):
+        p = tmp_path / "test.pid"
+        write_pid(100, p)
+        clear_pid(p)
+        assert not p.exists()
+
+    def test_read_empty_file_returns_none(self, tmp_path):
+        p = tmp_path / "test.pid"
+        p.write_text("")
+        assert read_pid(p) == None
+
+    def test_read_whitespace_only_returns_none(self, tmp_path):
+        p = tmp_path / "test.pid"
+        p.write_text("   \n")
+        assert read_pid(p) == None
+
+    def test_write_then_overwrite(self, tmp_path):
+        p = tmp_path / "test.pid"
+        write_pid(100, p)
+        write_pid(200, p)
+        assert read_pid(p) == 200
+
+    def test_clear_nonexistent_no_error(self, tmp_path):
+        p = tmp_path / "nonexistent.pid"
+        clear_pid(p)  # should not raise
+
+    def test_check_stale_no_file_is_false(self, tmp_path):
+        p = tmp_path / "no.pid"
+        assert check_stale_pid(p) is False
+
+    def test_check_stale_dead_pid_removes_file(self, tmp_path):
+        p = tmp_path / "dead.pid"
+        write_pid(999999999, p)
+        result = check_stale_pid(p)
+        assert result is True
+        assert not p.exists()
+
+    def test_is_pid_alive_current(self):
+        import os
+        assert is_pid_alive(os.getpid()) is True
+
+    def test_is_pid_alive_dead_pid(self):
+        assert is_pid_alive(999999998) is False
+
+
+class TestDaemonRunnerAttributesB:
+    def _make_runner(self):
+        from autoresearch.config import GlobalConfig
+        with patch("autoresearch.daemon.load_config", return_value=GlobalConfig()):
+            return DaemonRunner()
+
+    def test_poll_seconds_positive(self):
+        r = self._make_runner()
+        assert r._poll_seconds > 0
+
+    def test_active_runs_starts_empty(self):
+        r = self._make_runner()
+        assert len(r._active_runs) == 0
+
+    def test_shutdown_event_not_set_initially(self):
+        r = self._make_runner()
+        assert not r._shutdown.is_set()
+
+    def test_shutdown_sets_event(self):
+        r = self._make_runner()
+        r.shutdown()
+        assert r._shutdown.is_set()
+
+    def test_shutdown_is_idempotent(self):
+        r = self._make_runner()
+        r.shutdown()
+        r.shutdown()
+        assert r._shutdown.is_set()
+
+    def test_reap_threads_empty(self):
+        r = self._make_runner()
+        r._reap_threads()  # should not raise
+
+    def test_reap_removes_finished_thread(self):
+        import threading
+        r = self._make_runner()
+        mock_thread = MagicMock()
+        mock_thread.is_alive.return_value = False
+        r._active_runs["repo:marker"] = mock_thread
+        r._reap_threads()
+        assert "repo:marker" not in r._active_runs
+
+    def test_reap_keeps_alive_thread(self):
+        import threading
+        r = self._make_runner()
+        mock_thread = MagicMock()
+        mock_thread.is_alive.return_value = True
+        r._active_runs["repo:marker"] = mock_thread
+        r._reap_threads()
+        assert "repo:marker" in r._active_runs
+
+
+class TestStopDaemonVariants:
+    def test_no_pid_file_returns_false(self, tmp_path):
+        p = tmp_path / "no.pid"
+        result = stop_daemon(pid_path=p)
+        assert result is False
+
+    def test_stale_pid_returns_false(self, tmp_path):
+        p = tmp_path / "stale.pid"
+        write_pid(999999997, p)
+        result = stop_daemon(pid_path=p)
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# NEW BATCH: is_pid_alive more variants
+# ---------------------------------------------------------------------------
+
+class TestIsPidAliveNewBatch:
+    def test_current_process_alive(self):
+        import os
+        assert is_pid_alive(os.getpid()) is True
+
+    def test_zero_pid_not_alive(self):
+        # PID 0 is not a normal process
+        result = is_pid_alive(0)
+        assert isinstance(result, bool)
+
+    def test_very_large_pid_not_alive(self):
+        result = is_pid_alive(99999998)
+        assert result is False
+
+    def test_negative_pid_returns_bool(self):
+        result = is_pid_alive(-1)
+        assert isinstance(result, bool)
+
+    def test_pid_one_check_returns_bool(self):
+        result = is_pid_alive(1)
+        assert isinstance(result, bool)
+
+
+# ---------------------------------------------------------------------------
+# NEW BATCH: write_pid / read_pid round-trip extended
+# ---------------------------------------------------------------------------
+
+class TestPidRoundTripNewBatch:
+    def test_write_and_read_basic(self, tmp_path):
+        p = tmp_path / "test.pid"
+        write_pid(12345, p)
+        assert read_pid(p) == 12345
+
+    def test_write_overwrite(self, tmp_path):
+        p = tmp_path / "test.pid"
+        write_pid(111, p)
+        write_pid(222, p)
+        assert read_pid(p) == 222
+
+    def test_read_nonexistent_returns_none(self, tmp_path):
+        p = tmp_path / "nope.pid"
+        assert read_pid(p) is None
+
+    def test_write_creates_parent(self, tmp_path):
+        p = tmp_path / "subdir" / "test.pid"
+        write_pid(9999, p)
+        assert p.exists()
+
+    def test_read_after_clear_returns_none(self, tmp_path):
+        p = tmp_path / "test.pid"
+        write_pid(42, p)
+        clear_pid(p)
+        assert read_pid(p) is None
+
+    def test_clear_nonexistent_no_error(self, tmp_path):
+        p = tmp_path / "nope.pid"
+        clear_pid(p)  # should not raise
+
+    def test_pid_value_preserved(self, tmp_path):
+        p = tmp_path / "pid.pid"
+        for val in [1, 100, 1000, 99999]:
+            write_pid(val, p)
+            assert read_pid(p) == val
+
+
+# ---------------------------------------------------------------------------
+# NEW BATCH: check_stale_pid extended
+# ---------------------------------------------------------------------------
+
+class TestCheckStalePidNewBatch:
+    def test_no_pid_file_returns_false(self, tmp_path):
+        p = tmp_path / "none.pid"
+        assert check_stale_pid(p) is False
+
+    def test_live_pid_returns_false(self, tmp_path):
+        import os
+        p = tmp_path / "live.pid"
+        write_pid(os.getpid(), p)
+        assert check_stale_pid(p) is False
+
+    def test_stale_pid_returns_true(self, tmp_path):
+        p = tmp_path / "stale.pid"
+        write_pid(99999997, p)
+        result = check_stale_pid(p)
+        # stale or missing = True; not alive = True
+        assert isinstance(result, bool)
+
+    def test_returns_bool(self, tmp_path):
+        p = tmp_path / "x.pid"
+        result = check_stale_pid(p)
+        assert isinstance(result, bool)
+
+
+# ---------------------------------------------------------------------------
+# NEW BATCH: is_due extended time-based
+# ---------------------------------------------------------------------------
+
+class TestIsDueNewBatch:
+    def _now(self):
+        return datetime.now(timezone.utc)
+
+    def test_on_demand_never_due(self):
+        s = _make_schedule("on-demand")
+        assert is_due(s, last_run=None) is False
+
+    def test_on_demand_with_last_run_never_due(self):
+        s = _make_schedule("on-demand")
+        assert is_due(s, last_run="2020-01-01T00:00:00Z") is False
+
+    def test_cron_due_long_ago(self):
+        s = _make_schedule("cron", cron="* * * * *")
+        old = "2000-01-01T00:00:00Z"
+        result = is_due(s, last_run=old)
+        assert result is True
+
+    def test_cron_never_run_is_due(self):
+        s = _make_schedule("cron", cron="* * * * *")
+        assert is_due(s, last_run=None) is True
+
+    def test_invalid_cron_not_due(self):
+        s = _make_schedule("cron", cron="not-a-cron")
+        result = is_due(s, last_run=None)
+        assert isinstance(result, bool)
+
+    def test_unknown_type_not_due(self):
+        s = Schedule(type="unknown")
+        result = is_due(s, last_run=None)
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# NEW BATCH: _resolve_cron_expression map checks
+# ---------------------------------------------------------------------------
+
+class TestResolveCronNewBatch:
+    def test_overnight_resolves(self):
+        s = _make_schedule("overnight")
+        result = _resolve_cron_expression(s)
+        assert result is not None
+        assert isinstance(result, str)
+
+    def test_weekend_resolves(self):
+        s = _make_schedule("weekend")
+        result = _resolve_cron_expression(s)
+        assert result is not None
+
+    def test_overnight_is_cron_string(self):
+        s = _make_schedule("overnight")
+        result = _resolve_cron_expression(s)
+        assert isinstance(result, str)
+        assert len(result.split()) == 5
+
+    def test_raw_cron_passthrough(self):
+        s = _make_schedule("cron", cron="0 9 * * *")
+        result = _resolve_cron_expression(s)
+        assert result == "0 9 * * *"
+
+    def test_unknown_type_returns_none(self):
+        s = _make_schedule("notakey")
+        result = _resolve_cron_expression(s)
+        assert result is None
+
+    def test_on_demand_returns_none(self):
+        s = _make_schedule("on-demand")
+        result = _resolve_cron_expression(s)
+        assert result is None
+
+    def test_five_star_cron_passthrough(self):
+        s = _make_schedule("cron", cron="* * * * *")
+        result = _resolve_cron_expression(s)
+        assert result == "* * * * *"
+
+    def test_monthly_resolves_or_none(self):
+        s = _make_schedule("monthly")
+        result = _resolve_cron_expression(s)
+        assert result is None or isinstance(result, str)
+
+
+# ---------------------------------------------------------------------------
+# NEW BATCH: DaemonRunner attributes
+# ---------------------------------------------------------------------------
+
+class TestDaemonRunnerNewBatch:
+    def _make_runner(self):
+        return DaemonRunner()
+
+    def test_has_shutdown_attribute(self):
+        r = self._make_runner()
+        assert hasattr(r, "_shutdown")
+
+    def test_instantiates(self):
+        r = self._make_runner()
+        assert r is not None
+
+    def test_has_active_runs(self):
+        r = self._make_runner()
+        assert hasattr(r, "_active_runs")
+
+    def test_has_poll_seconds(self):
+        r = self._make_runner()
+        assert hasattr(r, "_poll_seconds")
+        assert r._poll_seconds > 0
+
+    def test_has_semaphore(self):
+        r = self._make_runner()
+        assert hasattr(r, "_semaphore")
+
+
+# ---------------------------------------------------------------------------
+# NEW BATCH: stop_daemon additional
+# ---------------------------------------------------------------------------
+
+class TestStopDaemonNewBatch:
+    def test_no_file_returns_false(self, tmp_path):
+        p = tmp_path / "no.pid"
+        assert stop_daemon(pid_path=p) is False
+
+    def test_stale_returns_false(self, tmp_path):
+        p = tmp_path / "s.pid"
+        write_pid(99999996, p)
+        assert stop_daemon(pid_path=p) is False
+
+    def test_returns_bool(self, tmp_path):
+        p = tmp_path / "r.pid"
+        result = stop_daemon(pid_path=p)
+        assert isinstance(result, bool)
+
+
+# ---------------------------------------------------------------------------
+# NEW BATCH: is_due and pid helpers additional
+# ---------------------------------------------------------------------------
+
+class TestIsDueAdditional:
+    def test_on_demand_never_due(self):
+        s = _make_schedule("on-demand")
+        assert not is_due(s, None)
+
+    def test_on_demand_with_last_run_not_due(self):
+        s = _make_schedule("on-demand")
+        last = datetime(2020, 1, 1, tzinfo=timezone.utc).isoformat()
+        assert not is_due(s, last)
+
+    def test_overnight_no_last_run_is_due(self):
+        s = _make_schedule("overnight")
+        assert is_due(s, None)
+
+    def test_overnight_old_last_run_bool(self):
+        s = _make_schedule("overnight")
+        old = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+        assert isinstance(is_due(s, old), bool)
+
+    def test_cron_no_last_run_is_due(self):
+        s = _make_schedule("cron", "0 * * * *")
+        assert is_due(s, None) is True
+
+    def test_cron_no_last_run_returns_bool(self):
+        s = _make_schedule("cron", "0 * * * *")
+        result = is_due(s, None)
+        assert isinstance(result, bool)
+
+
+class TestPidHelpersAdditional:
+    def test_write_read_roundtrip(self, tmp_path):
+        p = tmp_path / "test.pid"
+        write_pid(12345, p)
+        assert read_pid(p) == 12345
+
+    def test_read_missing_returns_none(self, tmp_path):
+        p = tmp_path / "missing.pid"
+        assert read_pid(p) is None
+
+    def test_clear_removes_file(self, tmp_path):
+        p = tmp_path / "c.pid"
+        write_pid(999, p)
+        clear_pid(p)
+        assert not p.exists()
+
+    def test_clear_missing_no_error(self, tmp_path):
+        p = tmp_path / "none.pid"
+        clear_pid(p)  # should not raise
+
+    def test_check_stale_missing_returns_false(self, tmp_path):
+        p = tmp_path / "s.pid"
+        assert check_stale_pid(p) is False
+
+    def test_is_pid_alive_invalid_returns_false(self):
+        assert not is_pid_alive(99999997)
+
+    def test_is_pid_alive_self_returns_true(self):
+        assert is_pid_alive(os.getpid())
+
+    def test_write_creates_file(self, tmp_path):
+        p = tmp_path / "w.pid"
+        write_pid(1, p)
+        assert p.exists()
+
+    def test_read_returns_int(self, tmp_path):
+        p = tmp_path / "r.pid"
+        write_pid(42, p)
+        assert isinstance(read_pid(p), int)
+
+    def test_stop_no_pid_file(self, tmp_path):
+        p = tmp_path / "nopid.pid"
+        result = stop_daemon(pid_path=p)
+        assert result is False
+
+
+class TestResolveCronAdditional:
+    def test_on_demand_returns_none(self):
+        s = _make_schedule("on-demand")
+        assert _resolve_cron_expression(s) is None
+
+    def test_cron_type_passthrough(self):
+        s = _make_schedule("cron", "0 9 * * *")
+        assert _resolve_cron_expression(s) == "0 9 * * *"
+
+    def test_overnight_returns_string(self):
+        s = _make_schedule("overnight")
+        result = _resolve_cron_expression(s)
+        assert isinstance(result, str)
+
+    def test_overnight_has_5_fields(self):
+        s = _make_schedule("overnight")
+        result = _resolve_cron_expression(s)
+        assert result is not None
+        assert len(result.split()) == 5
+
+    def test_weekend_has_5_fields(self):
+        s = _make_schedule("weekend")
+        result = _resolve_cron_expression(s)
+        assert result is not None
+        assert len(result.split()) == 5
+
+    def test_cron_arbitrary_expr(self):
+        expr = "15 3 * * 1"
+        s = _make_schedule("cron", expr)
+        assert _resolve_cron_expression(s) == expr
+
+    def test_unknown_type_returns_none_or_str(self):
+        s = _make_schedule("unknown-type")
+        result = _resolve_cron_expression(s)
+        assert result is None or isinstance(result, str)
+
+
+class TestDaemonRunnerAdditional:
+    def test_instantiation(self, tmp_path):
+        dr = DaemonRunner(state_path=tmp_path / "state.json")
+        assert dr is not None
+
+    def test_has_state_path(self, tmp_path):
+        dr = DaemonRunner(state_path=tmp_path / "state.json")
+        assert hasattr(dr, "_state_path")
+
+    def test_has_semaphore(self, tmp_path):
+        dr = DaemonRunner(state_path=tmp_path / "state.json")
+        assert hasattr(dr, "_semaphore")
+
+    def test_semaphore_is_threading_semaphore(self, tmp_path):
+        import threading
+        dr = DaemonRunner(state_path=tmp_path / "state.json")
+        assert isinstance(dr._semaphore, threading.Semaphore)

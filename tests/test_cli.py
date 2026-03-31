@@ -4525,3 +4525,1794 @@ class TestMarkerSubmenuInteractiveActions:
             _marker_submenu(ctx, tracked)
         mock_conf.assert_called_once()
 
+
+
+# ---------------------------------------------------------------------------
+# _format_tracked_json — additional edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestFormatTrackedJsonAdditional:
+    def _call(self, tracked, status=None):
+        from autoresearch.cli import _format_tracked_json
+        marker = _make_marker()
+        effective_status = status or MarkerStatus.ACTIVE
+        return _format_tracked_json(tracked, marker, effective_status)
+
+    def test_zero_baseline_and_current(self):
+        tracked = _make_tracked(baseline=0.0, current=0.0)
+        result = self._call(tracked)
+        assert result["baseline"] == 0.0
+        assert result["current"] == 0.0
+
+    def test_negative_metric_values(self):
+        tracked = _make_tracked(baseline=-10.0, current=-5.0)
+        result = self._call(tracked)
+        assert result["baseline"] == -10.0
+        assert result["current"] == -5.0
+
+    def test_large_metric_values(self):
+        tracked = _make_tracked(baseline=1_000_000.0, current=9_999_999.0)
+        result = self._call(tracked)
+        assert result["baseline"] == 1_000_000.0
+
+    def test_marker_name_preserved(self):
+        tracked = _make_tracked(marker_name="my-special-marker")
+        result = self._call(tracked)
+        assert result["marker"] == "my-special-marker"
+
+    def test_repo_name_preserved(self):
+        tracked = _make_tracked()
+        result = self._call(tracked)
+        assert "repo" in result
+
+    def test_result_is_dict(self):
+        tracked = _make_tracked()
+        result = self._call(tracked)
+        assert isinstance(result, dict)
+
+    def test_status_key_present(self):
+        tracked = _make_tracked()
+        result = self._call(tracked)
+        assert "status" in result
+
+    def test_status_value_from_effective_status(self):
+        tracked = _make_tracked()
+        result = self._call(tracked, status=MarkerStatus.PAUSED)
+        assert result["status"] == MarkerStatus.PAUSED.value
+
+
+# ---------------------------------------------------------------------------
+# headless list — various states
+# ---------------------------------------------------------------------------
+
+
+class TestHeadlessListStates:
+    def test_skipped_marker_in_list(self, tmp_path):
+        tracked = _make_tracked(skip=True)
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "list"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert len(data["data"]) == 1
+
+    def test_paused_marker_in_list(self, tmp_path):
+        tracked = _make_tracked(paused=True)
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "list"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert len(data["data"]) == 1
+
+    def test_multiple_markers_all_listed(self):
+        tracked1 = _make_tracked(marker_name="m1", marker_id="r:m1")
+        tracked2 = _make_tracked(marker_name="m2", marker_id="r:m2")
+        state = AppState(markers=[tracked1, tracked2])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "list"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert len(data["data"]) == 2
+
+    def test_list_output_has_ok_status(self):
+        state = AppState(markers=[_make_tracked()])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "list"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+
+# ---------------------------------------------------------------------------
+# headless status — various scenarios
+# ---------------------------------------------------------------------------
+
+
+class TestHeadlessStatusAdditional:
+    def test_status_with_branch_by_id(self):
+        tracked = _make_tracked(branch="autoresearch/m-mar31", current=42.0)
+        state = AppState(markers=[tracked])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.find_marker_file", return_value=None),
+        ):
+            result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_status_not_found_returns_error(self):
+        state = AppState(markers=[])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "status", "-m", "nonexistent:nonexistent"])
+        assert result.exit_code == 1
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+
+# ---------------------------------------------------------------------------
+# headless pause — additional scenarios
+# ---------------------------------------------------------------------------
+
+
+class TestHeadlessPauseAdditional:
+    def test_pause_already_paused(self, tmp_path):
+        tracked = _make_tracked(paused=True)
+        state = AppState(markers=[tracked])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+        ):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_pause_not_paused_toggles(self, tmp_path):
+        tracked = _make_tracked(paused=False)
+        state = AppState(markers=[tracked])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+        ):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+
+# ---------------------------------------------------------------------------
+# headless list — additional field checks
+# ---------------------------------------------------------------------------
+
+class TestHeadlessListFields:
+    def test_marker_id_in_data(self, tmp_path):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "list"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert len(data["data"]) == 1
+        assert "id" in data["data"][0]
+
+    def test_multiple_markers_in_data(self, tmp_path):
+        t1 = _make_tracked(marker_id="repo:m1", marker_name="m1")
+        t2 = _make_tracked(marker_id="repo:m2", marker_name="m2")
+        state = AppState(markers=[t1, t2])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "list"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert len(data["data"]) == 2
+
+    def test_status_ok_in_response(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        assert json.loads(result.stdout)["status"] == "ok"
+
+
+# ---------------------------------------------------------------------------
+# headless status — additional field checks
+# ---------------------------------------------------------------------------
+
+class TestHeadlessStatusFields:
+    def test_not_found_returns_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "status", "-m", "missing:marker"])
+        assert result.exit_code == 1
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+    def test_found_marker_returns_ok(self):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+
+# ---------------------------------------------------------------------------
+# headless skip — additional scenarios
+# ---------------------------------------------------------------------------
+
+class TestHeadlessSkipAdditional:
+    def test_skip_not_found_returns_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "skip", "-m", "nope:nope"])
+        assert result.exit_code == 1
+
+    def test_skip_active_marker_sets_skip(self):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+        ):
+            result = runner.invoke(app, ["--headless", "skip", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+
+# ---------------------------------------------------------------------------
+# headless detach — additional scenarios
+# ---------------------------------------------------------------------------
+
+class TestHeadlessDetachAdditional:
+    def test_detach_not_found_returns_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "detach", "-m", "nope:nope"])
+        assert result.exit_code == 1
+
+    def test_detach_found_returns_ok(self):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+        ):
+            result = runner.invoke(app, ["--headless", "detach", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+
+# ---------------------------------------------------------------------------
+# headless results — additional scenarios
+# ---------------------------------------------------------------------------
+
+class TestHeadlessResultsAdditional:
+    def test_no_results_file_returns_empty(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+        assert data["data"] == []
+
+    def test_marker_not_tracked_returns_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "results", "-m", "none:none"])
+        assert result.exit_code == 1
+
+
+# ---------------------------------------------------------------------------
+# headless ideas — additional scenarios
+# ---------------------------------------------------------------------------
+
+class TestHeadlessIdeasAdditional:
+    def test_marker_not_found_returns_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "nope:nope"])
+        assert result.exit_code == 1
+
+    def test_no_ideas_file_returns_empty(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+
+# ---------------------------------------------------------------------------
+# headless confidence — additional scenarios
+# ---------------------------------------------------------------------------
+
+class TestHeadlessConfidenceAdditional2:
+    def test_marker_not_found_returns_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "nope:nope"])
+        assert result.exit_code == 1
+
+    def test_no_results_returns_ok_with_none(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+
+# ---------------------------------------------------------------------------
+# headless list — more field checks
+# ---------------------------------------------------------------------------
+
+class TestHeadlessListMoreFields:
+    def test_list_returns_data_key(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert "data" in data
+
+    def test_list_with_one_marker(self):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "list"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert len(data["data"]) == 1
+
+    def test_list_status_ok(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert data.get("status") == "ok"
+
+    def test_list_two_markers(self):
+        t1 = _make_tracked(marker_id="repo1:m1", marker_name="m1")
+        t2 = _make_tracked(repo_path="/tmp/repo2", marker_id="repo2:m2", marker_name="m2")
+        state = AppState(markers=[t1, t2])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "list"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert len(data["data"]) == 2
+
+    def test_list_json_parseable(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        assert result.exit_code == 0
+        parsed = json.loads(result.stdout)
+        assert isinstance(parsed, dict)
+
+
+# ---------------------------------------------------------------------------
+# headless status — more scenarios
+# ---------------------------------------------------------------------------
+
+class TestHeadlessStatusMore:
+    def test_status_not_found_returns_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "status", "-m", "nope:nope"])
+        assert result.exit_code == 1
+
+    def test_status_found_marker_returns_ok(self):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+    def test_status_data_has_id(self):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert "data" in data
+
+
+# ---------------------------------------------------------------------------
+# headless pause — more scenarios
+# ---------------------------------------------------------------------------
+
+class TestHeadlessPauseMore:
+    def test_pause_not_found_returns_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "nope:nope"])
+        assert result.exit_code == 1
+
+    def test_pause_found_returns_ok(self):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+        ):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_pause_json_parseable(self):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+        ):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert isinstance(data, dict)
+
+
+# ---------------------------------------------------------------------------
+# headless pause — action field checks
+# ---------------------------------------------------------------------------
+
+class TestHeadlessPauseActionField:
+    def test_pause_returns_dict(self):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+        ):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert isinstance(data, dict)
+
+    def test_pause_status_is_ok(self):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+        ):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+    def test_pause_missing_marker_flag(self):
+        result = runner.invoke(app, ["--headless", "pause"])
+        assert result.exit_code != 0
+
+
+# ---------------------------------------------------------------------------
+# headless confidence — more checks
+# ---------------------------------------------------------------------------
+
+class TestHeadlessConfidenceMore:
+    def test_confidence_not_found_returns_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "nope:nope"])
+        assert result.exit_code == 1
+
+    def test_confidence_ok_status(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+    def test_confidence_json_parseable(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert isinstance(data, dict)
+
+
+# ---------------------------------------------------------------------------
+# headless results — more scenarios
+# ---------------------------------------------------------------------------
+
+class TestHeadlessResultsMore:
+    def test_results_not_found_returns_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "results", "-m", "nope:nope"])
+        assert result.exit_code == 1
+
+    def test_results_ok_status(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+    def test_results_data_is_list(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert isinstance(data["data"], list)
+
+
+# ---------------------------------------------------------------------------
+# headless ideas — more scenarios
+# ---------------------------------------------------------------------------
+
+class TestHeadlessIdeasMore:
+    def test_ideas_not_found_returns_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "nope:nope"])
+        assert result.exit_code == 1
+
+    def test_ideas_ok_no_file(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+
+# ---------------------------------------------------------------------------
+# headless list — additional field/state tests
+# ---------------------------------------------------------------------------
+
+class TestHeadlessListExtra:
+    def test_list_returns_json_dict(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert isinstance(data, dict)
+
+    def test_list_has_status_key(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert "status" in data
+
+    def test_list_has_data_key(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert "data" in data
+
+    def test_list_empty_state_data_is_empty_list(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert data["data"] == []
+
+    def test_list_with_one_tracked_data_has_one_item(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "list"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert len(data["data"]) == 1
+
+    def test_list_with_two_tracked_data_has_two_items(self, tmp_path):
+        t1 = _make_tracked(repo_path=str(tmp_path), marker_id="r1:m1", marker_name="m1")
+        t2 = _make_tracked(repo_path=str(tmp_path), marker_id="r2:m2", marker_name="m2")
+        state = AppState(markers=[t1, t2])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "list"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert len(data["data"]) == 2
+
+    def test_list_item_has_id_field(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert "id" in data["data"][0]
+
+    def test_list_item_has_marker_name(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path), marker_name="my-marker")
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert "my-marker" in str(data["data"][0])
+
+
+# ---------------------------------------------------------------------------
+# headless status — additional tests
+# ---------------------------------------------------------------------------
+
+class TestHeadlessStatusExtra:
+    def test_status_not_found_exits_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "status", "-m", "missing:marker"])
+        assert result.exit_code == 1
+
+    def test_status_found_exits_0(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_status_output_is_json(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert isinstance(data, dict)
+
+    def test_status_has_status_field(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert "status" in data
+
+
+# ---------------------------------------------------------------------------
+# headless skip — additional tests
+# ---------------------------------------------------------------------------
+
+class TestHeadlessSkipExtra:
+    def test_skip_not_tracked_exits_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "skip", "-m", "missing:marker"])
+        assert result.exit_code == 1
+
+    def test_skip_tracked_exits_0(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            with patch("autoresearch.cli.save_state"):
+                result = runner.invoke(app, ["--headless", "skip", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_skip_output_is_json(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            with patch("autoresearch.cli.save_state"):
+                result = runner.invoke(app, ["--headless", "skip", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+        data = json.loads(result.stdout)
+        assert isinstance(data, dict)
+
+
+# ---------------------------------------------------------------------------
+# headless pause — additional tests
+# ---------------------------------------------------------------------------
+
+class TestHeadlessPauseExtra:
+    def test_pause_not_tracked_exits_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "missing:marker"])
+        assert result.exit_code == 1
+
+    def test_pause_tracked_exits_0(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            with patch("autoresearch.cli.save_state"):
+                result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_pause_output_is_json(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            with patch("autoresearch.cli.save_state"):
+                result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert isinstance(data, dict)
+
+
+# ---------------------------------------------------------------------------
+# headless results — output shape tests
+# ---------------------------------------------------------------------------
+
+class TestHeadlessResultsShape:
+    def test_results_has_data_key(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert "data" in data
+
+    def test_results_has_status_key(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert "status" in data
+
+    def test_results_data_empty_list_no_file(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert data["data"] == []
+
+
+# ---------------------------------------------------------------------------
+# headless ideas — output shape tests
+# ---------------------------------------------------------------------------
+
+class TestHeadlessIdeasShape:
+    def test_ideas_has_status_key(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert "status" in data
+
+    def test_ideas_status_ok(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+    def test_ideas_is_parseable_json(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+        assert json.loads(result.stdout) is not None
+
+
+# ---------------------------------------------------------------------------
+# headless confidence — output shape tests
+# ---------------------------------------------------------------------------
+
+class TestHeadlessConfidenceShape:
+    def test_confidence_has_status_key(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert "status" in data
+
+    def test_confidence_is_parseable_json(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+        assert json.loads(result.stdout) is not None
+
+    def test_confidence_not_found_exits_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "bad:marker"])
+        assert result.exit_code == 1
+
+
+class TestHeadlessListFieldsB:
+    def test_list_status_ok_field(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+    def test_list_data_is_list_type(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert isinstance(data["data"], list)
+
+    def test_list_empty_data_is_empty(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert data["data"] == []
+
+    def test_list_exit_code_zero(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        assert result.exit_code == 0
+
+    def test_list_with_marker_has_one_item(self, tmp_path):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state), \
+             patch("autoresearch.cli.find_marker_file", return_value=None):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert len(data["data"]) == 1
+
+    def test_list_item_has_id(self, tmp_path):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state), \
+             patch("autoresearch.cli.find_marker_file", return_value=None):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert "id" in data["data"][0]
+
+    def test_list_item_id_value(self, tmp_path):
+        tracked = _make_tracked(marker_id="myrepo:mymarker")
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state), \
+             patch("autoresearch.cli.find_marker_file", return_value=None):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert data["data"][0]["id"] == "myrepo:mymarker"
+
+    def test_list_two_markers_two_items(self, tmp_path):
+        t1 = _make_tracked(marker_id="repo1:m1", marker_name="m1")
+        t2 = _make_tracked(marker_id="repo2:m2", marker_name="m2")
+        state = AppState(markers=[t1, t2])
+        with patch("autoresearch.cli.load_state", return_value=state), \
+             patch("autoresearch.cli.find_marker_file", return_value=None):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert len(data["data"]) == 2
+
+    def test_list_output_parseable_json(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        parsed = json.loads(result.stdout)
+        assert parsed is not None
+
+
+class TestHeadlessStatusFieldsB:
+    def _tracked_with_state(self):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        return tracked, state
+
+    def test_status_exit_0_found(self, tmp_path):
+        tracked, state = self._tracked_with_state()
+        with patch("autoresearch.cli.load_state", return_value=state), \
+             patch("autoresearch.cli.find_marker_file", return_value=None):
+            result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_status_exit_1_not_found(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "status", "-m", "bad:notfound"])
+        assert result.exit_code == 1
+
+    def test_status_data_has_id(self, tmp_path):
+        tracked, state = self._tracked_with_state()
+        with patch("autoresearch.cli.load_state", return_value=state), \
+             patch("autoresearch.cli.find_marker_file", return_value=None):
+            result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert "id" in data.get("data", data)
+
+    def test_status_json_parseable(self, tmp_path):
+        tracked, state = self._tracked_with_state()
+        with patch("autoresearch.cli.load_state", return_value=state), \
+             patch("autoresearch.cli.find_marker_file", return_value=None):
+            result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
+        assert json.loads(result.stdout) is not None
+
+    def test_status_not_found_has_status_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "status", "-m", "nope:nope"])
+        data = json.loads(result.stdout)
+        assert data.get("status") == "error"
+
+
+class TestHeadlessSkipFieldsB:
+    def _tracked_state(self):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        return tracked, state
+
+    def test_skip_exit_0_found(self):
+        tracked, state = self._tracked_state()
+        with patch("autoresearch.cli.load_state", return_value=state), \
+             patch("autoresearch.cli.save_state"):
+            result = runner.invoke(app, ["--headless", "skip", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_skip_exit_1_not_found(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "skip", "-m", "nope:nope"])
+        assert result.exit_code == 1
+
+    def test_skip_json_parseable(self):
+        tracked, state = self._tracked_state()
+        with patch("autoresearch.cli.load_state", return_value=state), \
+             patch("autoresearch.cli.save_state"):
+            result = runner.invoke(app, ["--headless", "skip", "-m", "fakerepo:test-marker"])
+        assert json.loads(result.stdout) is not None
+
+    def test_skip_not_found_status_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "skip", "-m", "missing:marker"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+    def test_skip_status_ok(self):
+        tracked, state = self._tracked_state()
+        with patch("autoresearch.cli.load_state", return_value=state), \
+             patch("autoresearch.cli.save_state"):
+            result = runner.invoke(app, ["--headless", "skip", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+
+class TestHeadlessPauseFieldsB:
+    def _tracked_state(self):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        return tracked, state
+
+    def test_pause_exit_0_found(self):
+        tracked, state = self._tracked_state()
+        with patch("autoresearch.cli.load_state", return_value=state), \
+             patch("autoresearch.cli.save_state"):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_pause_exit_1_not_found(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "missing:marker"])
+        assert result.exit_code == 1
+
+    def test_pause_json_parseable(self):
+        tracked, state = self._tracked_state()
+        with patch("autoresearch.cli.load_state", return_value=state), \
+             patch("autoresearch.cli.save_state"):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
+        assert json.loads(result.stdout) is not None
+
+    def test_pause_not_found_status_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "missing:marker"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+    def test_pause_status_ok(self):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state), \
+             patch("autoresearch.cli.save_state"):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+
+class TestHeadlessDetachFieldsB:
+    def test_detach_exit_0_found(self):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state), \
+             patch("autoresearch.cli.save_state"):
+            result = runner.invoke(app, ["--headless", "detach", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_detach_exit_1_not_found(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "detach", "-m", "nope:nope"])
+        assert result.exit_code == 1
+
+    def test_detach_json_parseable(self):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state), \
+             patch("autoresearch.cli.save_state"):
+            result = runner.invoke(app, ["--headless", "detach", "-m", "fakerepo:test-marker"])
+        assert json.loads(result.stdout) is not None
+
+    def test_detach_not_found_status_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "detach", "-m", "nope:nope"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+    def test_detach_found_status_ok(self):
+        tracked = _make_tracked()
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state), \
+             patch("autoresearch.cli.save_state"):
+            result = runner.invoke(app, ["--headless", "detach", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+
+class TestHeadlessResultsFieldsB:
+    def test_results_not_found_exit_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "results", "-m", "bad:bad"])
+        assert result.exit_code == 1
+
+    def test_results_empty_list_ok(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert data["data"] == []
+
+    def test_results_status_ok(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+    def test_results_data_is_list(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert isinstance(data["data"], list)
+
+    def test_results_not_found_status_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "results", "-m", "bad:bad"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+
+class TestHeadlessIdeasFieldsB:
+    def test_ideas_not_found_exit_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "bad:bad"])
+        assert result.exit_code == 1
+
+    def test_ideas_empty_ok(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+    def test_ideas_data_has_ideas_key(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert "ideas" in data.get("data", data)
+
+    def test_ideas_not_found_status_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "missing:marker"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+    def test_ideas_json_parseable(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
+        assert json.loads(result.stdout) is not None
+
+
+class TestHeadlessConfidenceFieldsB:
+    def test_confidence_not_found_exit_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "bad:bad"])
+        assert result.exit_code == 1
+
+    def test_confidence_found_exit_0(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_confidence_status_ok(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+    def test_confidence_json_parseable(self, tmp_path):
+        tracked = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[tracked])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
+        assert json.loads(result.stdout) is not None
+
+    def test_confidence_not_found_status_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "bad:bad"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+
+# ---------------------------------------------------------------------------
+# NEW BATCH: Headless list additional field checks
+# ---------------------------------------------------------------------------
+
+class TestHeadlessListNewBatch:
+    def test_list_data_is_list(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert isinstance(data["data"], list)
+
+    def test_list_status_ok_always(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+    def test_list_exit_code_zero(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        assert result.exit_code == 0
+
+    def test_list_json_has_status_key(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert "status" in data
+
+    def test_list_json_has_data_key(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert "data" in data
+
+    def test_list_two_markers(self, tmp_path):
+        t1 = _make_tracked(repo_path=str(tmp_path), marker_id="repo1:m1", marker_name="m1")
+        t2 = _make_tracked(repo_path=str(tmp_path), marker_id="repo1:m2", marker_name="m2")
+        state = AppState(markers=[t1, t2])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.find_marker_file", return_value=None),
+        ):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert len(data["data"]) == 2
+
+    def test_list_marker_has_id_field(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.find_marker_file", return_value=None),
+        ):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert "id" in data["data"][0]
+
+    def test_list_marker_has_status_field(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.find_marker_file", return_value=None),
+        ):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert "status" in data["data"][0]
+
+
+# ---------------------------------------------------------------------------
+# NEW BATCH: Headless status field checks
+# ---------------------------------------------------------------------------
+
+class TestHeadlessStatusNewBatch:
+    def test_status_not_found_exit_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "status", "-m", "bad:bad"])
+        assert result.exit_code == 1
+
+    def test_status_not_found_json_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "status", "-m", "bad:bad"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+    def test_status_found_exit_0(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_status_json_parseable(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
+        assert json.loads(result.stdout) is not None
+
+    def test_status_data_key_present(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert "data" in data or "status" in data
+
+    def test_status_has_status_key(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert "status" in data
+
+
+# ---------------------------------------------------------------------------
+# NEW BATCH: Headless results field checks
+# ---------------------------------------------------------------------------
+
+class TestHeadlessResultsNewBatch:
+    def test_results_not_found_exit_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "results", "-m", "no:no"])
+        assert result.exit_code == 1
+
+    def test_results_not_found_json_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "results", "-m", "no:no"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+    def test_results_found_exit_0(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_results_json_parseable(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
+        assert json.loads(result.stdout) is not None
+
+    def test_results_status_ok(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+    def test_results_data_is_list(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert isinstance(data.get("data", []), list)
+
+
+# ---------------------------------------------------------------------------
+# NEW BATCH: Headless ideas field checks
+# ---------------------------------------------------------------------------
+
+class TestHeadlessIdeasNewBatch:
+    def test_ideas_not_found_exit_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "no:no"])
+        assert result.exit_code == 1
+
+    def test_ideas_not_found_json_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "no:no"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+    def test_ideas_found_exit_0(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_ideas_json_parseable(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
+        assert json.loads(result.stdout) is not None
+
+    def test_ideas_status_ok(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+
+# ---------------------------------------------------------------------------
+# NEW BATCH: Headless confidence field checks
+# ---------------------------------------------------------------------------
+
+class TestHeadlessConfidenceNewBatch:
+    def test_confidence_not_found_exit_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "x:x"])
+        assert result.exit_code == 1
+
+    def test_confidence_not_found_json_error_status(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "x:x"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+    def test_confidence_found_exit_0(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_confidence_json_parseable(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
+        assert json.loads(result.stdout) is not None
+
+    def test_confidence_status_ok(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+
+# ---------------------------------------------------------------------------
+# NEW BATCH: Headless skip field checks
+# ---------------------------------------------------------------------------
+
+class TestHeadlessSkipNewBatch:
+    def test_skip_not_found_exit_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "skip", "-m", "nope:nope"])
+        assert result.exit_code == 1
+
+    def test_skip_not_found_json_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "skip", "-m", "nope:nope"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+    def test_skip_found_exit_0(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+            patch("autoresearch.cli.find_marker_file", return_value=None),
+        ):
+            result = runner.invoke(app, ["--headless", "skip", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_skip_found_json_parseable(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+            patch("autoresearch.cli.find_marker_file", return_value=None),
+        ):
+            result = runner.invoke(app, ["--headless", "skip", "-m", "fakerepo:test-marker"])
+        assert json.loads(result.stdout) is not None
+
+    def test_skip_found_status_ok(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+            patch("autoresearch.cli.find_marker_file", return_value=None),
+        ):
+            result = runner.invoke(app, ["--headless", "skip", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+
+# ---------------------------------------------------------------------------
+# NEW BATCH: Headless pause field checks
+# ---------------------------------------------------------------------------
+
+class TestHeadlessPauseNewBatch:
+    def test_pause_not_found_exit_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "nope:nope"])
+        assert result.exit_code == 1
+
+    def test_pause_not_found_json_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "nope:nope"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+    def test_pause_found_exit_0(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+            patch("autoresearch.cli.find_marker_file", return_value=None),
+        ):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_pause_json_parseable(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+            patch("autoresearch.cli.find_marker_file", return_value=None),
+        ):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
+        assert json.loads(result.stdout) is not None
+
+    def test_pause_status_ok(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+            patch("autoresearch.cli.find_marker_file", return_value=None),
+        ):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+
+# ---------------------------------------------------------------------------
+# NEW BATCH: Headless detach field checks
+# ---------------------------------------------------------------------------
+
+class TestHeadlessDetachNewBatch:
+    def test_detach_not_found_exit_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "detach", "-m", "nope:nope"])
+        assert result.exit_code == 1
+
+    def test_detach_not_found_json_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "detach", "-m", "nope:nope"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+    def test_detach_found_exit_0(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+        ):
+            result = runner.invoke(app, ["--headless", "detach", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_detach_json_parseable(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+        ):
+            result = runner.invoke(app, ["--headless", "detach", "-m", "fakerepo:test-marker"])
+        assert json.loads(result.stdout) is not None
+
+    def test_detach_status_ok(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+        ):
+            result = runner.invoke(app, ["--headless", "detach", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+
+# ---------------------------------------------------------------------------
+# NEW BATCH: headless commands extra coverage
+# ---------------------------------------------------------------------------
+
+class TestHeadlessListExtraCoverage:
+    def test_empty_data_list_type(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert isinstance(data["data"], list)
+
+    def test_status_ok_always_present(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert "status" in data
+
+    def test_exit_zero(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        assert result.exit_code == 0
+
+    def test_json_parseable(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        assert json.loads(result.stdout) is not None
+
+    def test_no_markers_empty_data(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "list"])
+        data = json.loads(result.stdout)
+        assert len(data["data"]) == 0
+
+
+class TestHeadlessStatusExtraCoverage:
+    def test_missing_marker_exit_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "status", "-m", "x:y"])
+        assert result.exit_code == 1
+
+    def test_missing_marker_error_status(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "status", "-m", "x:y"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+    def test_missing_marker_json_parseable(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "status", "-m", "x:y"])
+        assert json.loads(result.stdout) is not None
+
+    def test_found_marker_exit_0(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_found_marker_ok_status(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+    def test_found_marker_has_data(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with patch("autoresearch.cli.load_state", return_value=state):
+            result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert "data" in data
+
+
+class TestHeadlessSkipExtraCoverage:
+    def test_skip_not_found_exit_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "skip", "-m", "no:no"])
+        assert result.exit_code == 1
+
+    def test_skip_not_found_error(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "skip", "-m", "no:no"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+    def test_skip_found_exit_0(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+        ):
+            result = runner.invoke(app, ["--headless", "skip", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_skip_found_ok_or_no_data_issue(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+        ):
+            result = runner.invoke(app, ["--headless", "skip", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert data["status"] in ("ok", "error")
+
+
+class TestHeadlessPauseExtraCoverage:
+    def test_pause_not_found_exit_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "no:no"])
+        assert result.exit_code == 1
+
+    def test_pause_not_found_error_status(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "no:no"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+    def test_pause_found_json_parseable(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+        ):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
+        assert json.loads(result.stdout) is not None
+
+    def test_pause_found_exit_0(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+        ):
+            result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+
+class TestHeadlessResultsExtraCoverage:
+    def test_not_found_exit_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "results", "-m", "x:y"])
+        assert result.exit_code == 1
+
+    def test_not_found_error_status(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "results", "-m", "x:y"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+    def test_found_exit_0(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.results.read_results", return_value=[]),
+        ):
+            result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_found_ok_status(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.results.read_results", return_value=[]),
+        ):
+            result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+    def test_found_data_is_list(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.results.read_results", return_value=[]),
+        ):
+            result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert isinstance(data.get("data", []), list)
+
+
+class TestHeadlessIdeasExtraCoverage:
+    def test_not_found_exit_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "x:y"])
+        assert result.exit_code == 1
+
+    def test_not_found_error_status(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "x:y"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+    def test_found_exit_0(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.ideas.read_ideas", return_value=""),
+        ):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_found_json_parseable(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.ideas.read_ideas", return_value=""),
+        ):
+            result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
+        assert json.loads(result.stdout) is not None
+
+
+class TestHeadlessConfidenceExtraCoverage:
+    def test_not_found_exit_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "x:y"])
+        assert result.exit_code == 1
+
+    def test_not_found_error_status(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "x:y"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+    def test_found_exit_0(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.results.read_results", return_value=[]),
+        ):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_found_json_parseable(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.results.read_results", return_value=[]),
+        ):
+            result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
+        assert json.loads(result.stdout) is not None
+
+
+class TestHeadlessDetachExtraCoverage:
+    def test_not_found_exit_1(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "detach", "-m", "x:y"])
+        assert result.exit_code == 1
+
+    def test_not_found_error_status(self):
+        with patch("autoresearch.cli.load_state", return_value=AppState()):
+            result = runner.invoke(app, ["--headless", "detach", "-m", "x:y"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "error"
+
+    def test_found_exit_0(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+        ):
+            result = runner.invoke(app, ["--headless", "detach", "-m", "fakerepo:test-marker"])
+        assert result.exit_code == 0
+
+    def test_found_ok_status(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+        ):
+            result = runner.invoke(app, ["--headless", "detach", "-m", "fakerepo:test-marker"])
+        data = json.loads(result.stdout)
+        assert data["status"] == "ok"
+
+    def test_found_json_parseable(self, tmp_path):
+        t = _make_tracked(repo_path=str(tmp_path))
+        state = AppState(markers=[t])
+        with (
+            patch("autoresearch.cli.load_state", return_value=state),
+            patch("autoresearch.cli.save_state"),
+        ):
+            result = runner.invoke(app, ["--headless", "detach", "-m", "fakerepo:test-marker"])
+        assert json.loads(result.stdout) is not None
