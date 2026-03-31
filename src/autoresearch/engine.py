@@ -58,6 +58,7 @@ class AgentResult:
     description: str
     exit_code: int
     output: str
+    telemetry: object | None = None
 
 
 class AgentRunner(ABC):
@@ -143,10 +144,12 @@ class EscalationState:
 
 
 class ClaudeCodeRunner(AgentRunner):
-    """Agent runner using Claude Code CLI (`claude -p`)."""
+    """Agent runner using Claude Code CLI with profile-based permissions."""
 
-    def __init__(self, model: str = "sonnet"):
-        self.model = model
+    def __init__(self, marker: "Marker"):
+        from autoresearch.marker import Marker  # noqa: F811
+        self.marker = marker
+        self.agent_config = marker.agent
 
     def invoke(
         self,
@@ -154,16 +157,39 @@ class ClaudeCodeRunner(AgentRunner):
         program: str,
         budget: str,
     ) -> AgentResult:
+        from autoresearch.agent_profile import ensure_agent_dir
+        from autoresearch.telemetry import (
+            extract_description_from_telemetry,
+            parse_stream_json,
+            save_telemetry_report,
+        )
+
         if not shutil.which("claude"):
             raise AgentError("'claude' CLI not found on PATH")
 
+        paths = ensure_agent_dir(worktree_path, self.marker.name, self.marker)
         timeout_seconds = _parse_budget(budget)
+
+        model = self.agent_config.model or self.marker.loop.model or "sonnet"
+
         cmd = [
-            "claude",
-            "-p", program,
-            "--model", self.model,
-            "--dangerously-skip-permissions",
+            "claude", "-p", program,
+            "--model", model,
+            "--permission-mode", self.agent_config.permission_mode,
+            "--settings", str(paths.settings_path),
+            "--append-system-prompt", paths.claude_md_path.read_text(),
+            "--output-format", "stream-json",
+            "--verbose",
+            "--debug-file", str(paths.debug_log_path),
         ]
+
+        if self.agent_config.effort:
+            cmd.extend(["--effort", self.agent_config.effort])
+        if self.agent_config.allowed_tools:
+            cmd.extend(["--allowedTools", *self.agent_config.allowed_tools])
+        if self.agent_config.disallowed_tools:
+            cmd.extend(["--disallowedTools", *self.agent_config.disallowed_tools])
+        cmd.extend(self.agent_config.extra_flags)
 
         try:
             result = subprocess.run(
@@ -175,12 +201,25 @@ class ClaudeCodeRunner(AgentRunner):
                 errors="replace",
             )
             output = result.stdout or ""
-            description = _extract_description(output)
+
+            # Save stream-json log
+            if output:
+                paths.stream_log_path.write_text(output, errors="replace")
+
+            # Parse telemetry
+            telemetry = parse_stream_json(output)
+            ts = paths.stream_log_path.stem.replace("run-", "")
+            save_telemetry_report(telemetry, paths.logs_dir, ts)
+
+            # Extract description: prefer telemetry, fall back to heuristic
+            description = extract_description_from_telemetry(telemetry) or _extract_description(output)
+
             return AgentResult(
                 success=result.returncode == 0,
                 description=description,
                 exit_code=result.returncode,
                 output=output[-4000:],
+                telemetry=telemetry,
             )
         except subprocess.TimeoutExpired as e:
             partial = ""
@@ -194,9 +233,9 @@ class ClaudeCodeRunner(AgentRunner):
             )
 
 
-def get_agent_runner(model: str) -> AgentRunner:
-    """Return the appropriate agent runner for the given model string."""
-    return ClaudeCodeRunner(model=model)
+def get_agent_runner(marker: "Marker") -> AgentRunner:
+    """Return the appropriate agent runner for the given marker."""
+    return ClaudeCodeRunner(marker=marker)
 
 
 def run_marker(
@@ -324,6 +363,7 @@ def run_marker(
                 esc.on_discard()
                 _reset_to_before_commit(wt_info.path, commit_hash)
                 _write_discard_idea(wt_info.path, marker.name, agent_result.description, new_metric)
+                _write_telemetry_feedback(wt_info.path, marker.name, agent_result)
                 append_result(wt_info.path, marker.name, ExperimentResult(
                     commit=commit_hash,
                     metric=new_metric,
@@ -504,6 +544,24 @@ def _write_discard_idea(
     try:
         entry = f"**{description}** (metric: {metric}, discarded)"
         append_idea(worktree_path, marker_name, "Discarded but Promising", entry)
+    except (ValueError, OSError):
+        pass
+
+
+def _write_telemetry_feedback(
+    worktree_path: Path, marker_name: str, agent_result: AgentResult
+) -> None:
+    """Write telemetry errors and permission denials to ideas backlog."""
+    if not agent_result.telemetry:
+        return
+    try:
+        telemetry = agent_result.telemetry
+        if hasattr(telemetry, "errors") and telemetry.errors:
+            summary = "; ".join(telemetry.errors[:3])
+            append_idea(worktree_path, marker_name, "Discarded but Promising", f"**Agent errors:** {summary}")
+        if hasattr(telemetry, "permission_denials") and telemetry.permission_denials:
+            summary = "; ".join(telemetry.permission_denials[:3])
+            append_idea(worktree_path, marker_name, "Near-Misses", f"**Permission denied:** {summary}")
     except (ValueError, OSError):
         pass
 

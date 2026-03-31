@@ -491,9 +491,10 @@ def run_cmd(
         if repo and eff != MarkerStatus.ACTIVE:
             continue
 
-        use_model = model or m.loop.model or "sonnet"
+        if model:
+            m.agent.model = model
         try:
-            agent_runner = get_agent_runner(use_model)
+            agent_runner = get_agent_runner(m)
             run_result = engine_run(
                 repo_path=Path(t.repo_path),
                 marker=m,
@@ -774,9 +775,8 @@ def _run_single_marker(ctx: typer.Context, tracked):
         return
 
     state = _load_state(ctx)
-    model = marker.loop.model or "sonnet"
     try:
-        runner = get_agent_runner(model)
+        runner = get_agent_runner(marker)
         result = run_marker(
             repo_path=Path(tracked.repo_path),
             marker=marker,

@@ -70,6 +70,15 @@ class ResultsConfig(BaseModel):
     auto_merge: bool = False
 
 
+class AgentConfig(BaseModel):
+    model: str = ""
+    effort: str = "medium"
+    permission_mode: str = "bypassPermissions"
+    allowed_tools: list[str] = []
+    disallowed_tools: list[str] = []
+    extra_flags: list[str] = []
+
+
 class Marker(BaseModel):
     name: str
     description: str = ""
@@ -81,6 +90,7 @@ class Marker(BaseModel):
     escalation: Escalation = Escalation()
     schedule: Schedule = Schedule()
     results: ResultsConfig = ResultsConfig()
+    agent: AgentConfig = AgentConfig()
 
 
 class MarkerFile(BaseModel):

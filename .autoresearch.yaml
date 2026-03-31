@@ -16,15 +16,25 @@ markers:
       command: "python3 -m pytest --tb=no -q 2>&1 | tail -1"
       extract: '(\d+) passed'
       direction: higher
-      baseline: 251
+      baseline: 281
     guard:
       command: "python3 -m pytest --tb=short -q 2>&1"
       extract: '(\d+) passed'
-      threshold: 251
+      threshold: 281
       rework_attempts: 2
     loop:
       model: sonnet
       budget_per_experiment: 25m
       max_experiments: 10
+    agent:
+      model: sonnet
+      effort: medium
+      permission_mode: bypassPermissions
+      allowed_tools:
+        - "Edit(tests/*)"
+        - "Read(*)"
+        - "Bash(python3:*,pytest:*)"
+      disallowed_tools:
+        - "Bash(rm:*,git push:*,curl:*)"
     schedule:
       type: on-demand

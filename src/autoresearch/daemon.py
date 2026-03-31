@@ -195,8 +195,7 @@ class DaemonRunner:
             if not t:
                 return
 
-            model = marker.loop.model or "sonnet"
-            agent_runner = get_agent_runner(model)
+            agent_runner = get_agent_runner(marker)
             result = run_marker(
                 repo_path=Path(t.repo_path),
                 marker=marker,
