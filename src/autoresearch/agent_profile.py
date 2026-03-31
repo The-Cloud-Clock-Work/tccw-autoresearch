@@ -108,18 +108,20 @@ def generate_claude_md(marker: Marker, repo_path: Path | None = None) -> str:
 def init_autoresearch_dir(repo_path: Path) -> Path:
     """Create .autoresearch/ directory with default agent profile.
 
+    Additive only — never overwrites existing files.
     Returns the .autoresearch/ path.
     """
     ar_dir = repo_path / ".autoresearch"
-    agents_dir = ar_dir / "agents" / "default"
-    agents_dir.mkdir(parents=True, exist_ok=True)
 
-    # Copy default agent from shipped package
-    for filename in ("CLAUDE.md", "settings.json"):
-        src = DEFAULT_AGENT_DIR / filename
-        dst = agents_dir / filename
-        if src.is_file() and not dst.is_file():
-            shutil.copy2(src, dst)
+    # Walk the shipped default agent and copy everything that doesn't exist yet
+    for src_file in DEFAULT_AGENT_DIR.rglob("*"):
+        if not src_file.is_file():
+            continue
+        rel = src_file.relative_to(DEFAULT_AGENT_DIR)
+        dst = ar_dir / "agents" / "default" / rel
+        if not dst.exists():
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src_file, dst)
 
     return ar_dir
 

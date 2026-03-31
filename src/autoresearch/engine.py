@@ -172,12 +172,13 @@ class ClaudeCodeRunner(AgentRunner):
 
         model = self.agent_config.model or self.marker.loop.model or "sonnet"
 
+        # Run claude from the agent dir (inherits CLAUDE.md, .claude/settings, rules, etc.)
+        # Use --add-dir to give access to the actual worktree
         cmd = [
             "claude", "-p", program,
             "--model", model,
             "--permission-mode", self.agent_config.permission_mode,
-            "--settings", str(paths.settings_path),
-            "--append-system-prompt", paths.claude_md_path.read_text(),
+            "--add-dir", str(worktree_path),
             "--output-format", "stream-json",
             "--verbose",
             "--debug-file", str(paths.debug_log_path),
@@ -194,7 +195,7 @@ class ClaudeCodeRunner(AgentRunner):
         try:
             result = subprocess.run(
                 cmd,
-                cwd=worktree_path,
+                cwd=str(paths.agent_dir),  # run FROM the agent dir
                 capture_output=True,
                 text=True,
                 timeout=timeout_seconds,

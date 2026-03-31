@@ -333,20 +333,14 @@ def init_cmd(
     ar_dir = repo_path / CONFIG_DIR
     config_path = ar_dir / CONFIG_FILENAME
 
-    if config_path.is_file():
-        if is_headless(ctx):
-            headless_output(ctx, err_json(f"Already initialized: {config_path}"))
-            raise typer.Exit(code=1)
-        console.print(f"[yellow]Already initialized: {config_path}[/yellow]")
-        raise typer.Exit(code=1)
+    already_has_config = config_path.is_file()
 
+    # Always sync agent files (additive, never overwrites)
     ar_dir = init_autoresearch_dir(repo_path)
 
-    # Write template config.yaml
-    template = (Path(__file__).parent / "agents" / "config_template.yaml")
-    if template.is_file():
-        shutil.copy2(template, config_path)
-    else:
+    # Only write template config if it doesn't exist
+    if not already_has_config:
+        config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(CONFIG_TEMPLATE)
 
     if is_headless(ctx):
@@ -354,10 +348,14 @@ def init_cmd(
             "path": str(ar_dir),
             "config": str(config_path),
             "agents_dir": str(ar_dir / "agents"),
+            "config_created": not already_has_config,
         }))
     else:
-        console.print(f"[green]Initialized .autoresearch/ in {repo_path}[/green]")
-        console.print(f"  Config: {config_path}")
+        if already_has_config:
+            console.print(f"[green]Synced agent files in {ar_dir}[/green]")
+        else:
+            console.print(f"[green]Initialized .autoresearch/ in {repo_path}[/green]")
+        console.print(f"  Config: {config_path}" + (" [dim](already existed)[/dim]" if already_has_config else ""))
         console.print(f"  Agent:  {ar_dir / 'agents' / 'default'}/")
         console.print()
         console.print("[dim]Edit config.yaml to configure your markers.[/dim]")
