@@ -1,0 +1,1 @@
+../../../default/.claude/rules/git-discipline.md

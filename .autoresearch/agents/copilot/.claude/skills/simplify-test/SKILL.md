@@ -1,0 +1,1 @@
+../../../../default/.claude/skills/simplify-test/SKILL.md

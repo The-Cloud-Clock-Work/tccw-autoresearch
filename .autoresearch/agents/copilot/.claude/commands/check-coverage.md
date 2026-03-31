@@ -1,0 +1,1 @@
+../../../default/.claude/commands/check-coverage.md

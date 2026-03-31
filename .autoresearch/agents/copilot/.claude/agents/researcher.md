@@ -1,0 +1,1 @@
+../../../default/.claude/agents/researcher.md

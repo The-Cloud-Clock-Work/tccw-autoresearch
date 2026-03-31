@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -123,6 +124,14 @@ def init_autoresearch_dir(repo_path: Path) -> Path:
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src_file, dst)
 
+    # Symlink default agent files into all custom agents
+    agents_dir = ar_dir / "agents"
+    if agents_dir.is_dir():
+        default_src = agents_dir / "default"
+        for agent_dir in agents_dir.iterdir():
+            if agent_dir.is_dir() and agent_dir.name != "default":
+                link_agent_defaults(agent_dir, default_src)
+
     return ar_dir
 
 
@@ -140,7 +149,9 @@ def link_agent_defaults(agent_dir: Path, default_dir: Path) -> None:
         if dst.exists() or dst.is_symlink():
             continue
         dst.parent.mkdir(parents=True, exist_ok=True)
-        dst.symlink_to(src)
+        # Relative symlink: portable across machines
+        relative_target = os.path.relpath(src.resolve(), dst.parent.resolve())
+        dst.symlink_to(relative_target)
 
 
 def ensure_agent_dir(

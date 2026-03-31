@@ -1,0 +1,1 @@
+../../../default/.claude/rules/autoresearch-agent.md
