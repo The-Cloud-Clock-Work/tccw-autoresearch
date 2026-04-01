@@ -20,6 +20,26 @@ LOOP:
   8. REPEAT until budget exhausted or target reached
 ```
 
+## Hard Dependency: Claude Code
+
+AutoResearch is an **orchestrator**, not a code editor. The actual code changes are performed by [Claude Code](https://docs.anthropic.com/en/docs/claude-code) agents (`claude` CLI), spawned as subprocesses.
+
+```
+autoresearch (orchestrator)
+  └── claude (agent) ← hard dependency, does the actual coding
+        ├── reads mutable target files
+        ├── edits code based on improvement ideas
+        ├── runs the metric harness
+        └── commits changes if improved
+```
+
+The engine passes each agent:
+- **Mutable/immutable file rules** — translated to `--allowedTools` / `--disallowedTools` CLI flags
+- **Agent profile** — CLAUDE.md, rules, and settings from `.autoresearch/agents/`
+- **Program** — generated instructions describing what to attempt
+
+Without `claude` on PATH, the engine cannot run experiments.
+
 ## Key Design Principles
 
 - **The repo is the engine** — `.autoresearch.yaml` carries everything needed to run
