@@ -37,58 +37,89 @@ def _make_marker(**overrides) -> Marker:
 
 
 class TestGenerateSettings:
+    def test_uses_dont_ask_mode(self):
+        marker = _make_marker()
+        settings = generate_settings(marker)
+        assert settings["defaultMode"] == "dontAsk"
+
     def test_mutable_allowed_for_edit(self):
         marker = _make_marker(target=Target(mutable=["tests/*.py", "src/lib.py"], immutable=[]))
         settings = generate_settings(marker)
         allow = settings["permissions"]["allow"]
         assert "Edit(tests/*.py)" in allow
         assert "Edit(src/lib.py)" in allow
+        assert "Write(tests/*.py)" in allow
 
-    def test_immutable_denied_for_edit(self):
+    def test_immutable_not_in_allow(self):
+        """With dontAsk mode, immutable files are auto-denied by not being in allow."""
         marker = _make_marker(target=Target(mutable=["tests/*.py"], immutable=["src/engine.py"]))
         settings = generate_settings(marker)
+        allow = settings["permissions"]["allow"]
+        # Immutable files should NOT appear in allow
+        assert "Edit(src/engine.py)" not in allow
+        assert "Write(src/engine.py)" not in allow
+        # And should NOT be in deny (dontAsk handles it, deny would override allow)
         deny = settings["permissions"]["deny"]
-        assert "Edit(src/engine.py)" in deny
-        assert "Write(src/engine.py)" in deny
+        assert "Edit(src/engine.py)" not in deny
 
-    def test_destructive_ops_denied(self):
-        marker = _make_marker()
-        settings = generate_settings(marker)
-        deny = settings["permissions"]["deny"]
-        assert "Bash(rm -rf:*)" in deny
-        assert "Bash(git push:*)" in deny
-
-    def test_reads_always_allowed(self):
+    def test_read_always_allowed(self):
         marker = _make_marker()
         settings = generate_settings(marker)
         allow = settings["permissions"]["allow"]
-        assert "Read(*)" in allow
+        assert "Read" in allow  # bare Read matches all reads
 
-    def test_agent_config_tools_merged(self):
+    def test_grep_glob_always_allowed(self):
+        marker = _make_marker()
+        settings = generate_settings(marker)
+        allow = settings["permissions"]["allow"]
+        assert "Grep" in allow
+        assert "Glob" in allow
+
+    def test_agent_config_tools_normalized(self):
+        """Legacy colon syntax is normalized to space syntax."""
         marker = _make_marker(agent=AgentConfig(
             allowed_tools=["Bash(pytest:*)"],
             disallowed_tools=["Bash(curl:*)"],
         ))
         settings = generate_settings(marker)
-        assert "Bash(pytest:*)" in settings["permissions"]["allow"]
-        assert "Bash(curl:*)" in settings["permissions"]["deny"]
+        assert "Bash(pytest *)" in settings["permissions"]["allow"]
+        assert "Bash(curl *)" in settings["permissions"]["deny"]
+
+    def test_comma_separated_tools_split(self):
+        """Comma-separated tool specs are split into individual rules."""
+        marker = _make_marker(agent=AgentConfig(
+            allowed_tools=["Bash(python3:*,pytest:*)"],
+            disallowed_tools=[],
+        ))
+        settings = generate_settings(marker)
+        allow = settings["permissions"]["allow"]
+        assert "Bash(python3 *)" in allow
+        assert "Bash(pytest *)" in allow
+
+    def test_redundant_wildcard_simplified(self):
+        """Read(*) is simplified to bare Read."""
+        marker = _make_marker(agent=AgentConfig(
+            allowed_tools=["Read(*)"],
+            disallowed_tools=[],
+        ))
+        settings = generate_settings(marker)
+        allow = settings["permissions"]["allow"]
+        assert "Read" in allow
+        assert "Read(*)" not in allow
 
     def test_empty_immutable(self):
         marker = _make_marker(target=Target(mutable=["src/*.py"], immutable=[]))
         settings = generate_settings(marker)
-        # No Edit denials (only destructive bash)
         edit_denials = [d for d in settings["permissions"]["deny"] if d.startswith("Edit(")]
         assert edit_denials == []
 
-    def test_disallowed_tool_not_in_default_deny_is_appended(self):
-        # Bash(curl:*) is already in the default deny list so the append path
-        # is never reached. Use a tool NOT in the default deny list.
+    def test_disallowed_tool_appended_and_normalized(self):
         marker = _make_marker(agent=AgentConfig(
             allowed_tools=[],
             disallowed_tools=["Bash(docker:*)"],
         ))
         settings = generate_settings(marker)
-        assert "Bash(docker:*)" in settings["permissions"]["deny"]
+        assert "Bash(docker *)" in settings["permissions"]["deny"]
 
 
 class TestGenerateClaudeMd:

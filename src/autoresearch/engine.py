@@ -158,7 +158,7 @@ class ClaudeCodeRunner(AgentRunner):
         program: str,
         budget: str,
     ) -> AgentResult:
-        from autoresearch.agent_profile import DEFAULT_AGENT_DIR, ensure_agent_dir
+        from autoresearch.agent_profile import DEFAULT_AGENT_DIR, build_cli_permission_flags, ensure_agent_dir
         from autoresearch.telemetry import (
             extract_description_from_telemetry,
             parse_stream_json,
@@ -194,10 +194,14 @@ class ClaudeCodeRunner(AgentRunner):
 
         if self.agent_config.effort:
             cmd.extend(["--effort", self.agent_config.effort])
-        if self.agent_config.allowed_tools:
-            cmd.extend(["--allowedTools", *self.agent_config.allowed_tools])
-        if self.agent_config.disallowed_tools:
-            cmd.extend(["--disallowedTools", *self.agent_config.disallowed_tools])
+
+        # Build permission flags from marker config (mutable/immutable + agent tools)
+        allowed_tools, disallowed_tools = build_cli_permission_flags(self.marker, worktree_path)
+        if allowed_tools:
+            cmd.extend(["--allowedTools", *allowed_tools])
+        if disallowed_tools:
+            cmd.extend(["--disallowedTools", *disallowed_tools])
+
         cmd.extend(self.agent_config.extra_flags)
 
         # Load .env from agent dir if it exists

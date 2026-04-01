@@ -27,15 +27,17 @@ markers:
       budget_per_experiment: 25m
       max_experiments: 10
     agent:
-      name: default
+      name: copilot
       model: sonnet
       effort: medium
       permission_mode: bypassPermissions
       allowed_tools:
         - "Edit(tests/*)"
-        - "Read(*)"
-        - "Bash(python3:*,pytest:*)"
+        - "Bash(python3 *)"
+        - "Bash(pytest *)"
       disallowed_tools:
-        - "Bash(rm:*,git push:*,curl:*)"
+        - "Bash(rm *)"
+        - "Bash(git push *)"
+        - "Bash(curl *)"
     schedule:
       type: on-demand

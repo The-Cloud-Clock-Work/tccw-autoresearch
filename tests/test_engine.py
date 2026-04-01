@@ -1077,14 +1077,15 @@ class TestClaudeCodeRunnerCmdBranches:
         marker = _make_marker(agent=AgentConfig(allowed_tools=["Bash(pytest:*)"]))
         cmd = self._invoke_capturing_cmd(marker, tmp_path)
         assert "--allowedTools" in cmd
-        assert "Bash(pytest:*)" in cmd
+        # Legacy colon syntax normalized to space syntax
+        assert "Bash(pytest *)" in cmd
 
     def test_disallowed_tools_appended(self, tmp_path):
         from autoresearch.marker import AgentConfig
         marker = _make_marker(agent=AgentConfig(disallowed_tools=["Bash(rm:*)"]))
         cmd = self._invoke_capturing_cmd(marker, tmp_path)
         assert "--disallowedTools" in cmd
-        assert "Bash(rm:*)" in cmd
+        assert "Bash(rm *)" in cmd
 
     def test_extra_flags_appended(self, tmp_path):
         from autoresearch.marker import AgentConfig
@@ -2247,17 +2248,21 @@ class TestClaudeCodeRunnerCmdStructure:
         cmd = self._run_and_capture_cmd(marker, tmp_path)
         assert "--add-dir" in cmd
 
-    def test_no_allowed_tools_flag_by_default(self, tmp_path):
+    def test_allowed_tools_always_present_from_mutable(self, tmp_path):
+        """build_cli_permission_flags always generates allow rules from mutable files."""
         from autoresearch.marker import AgentConfig
         marker = _make_marker(agent=AgentConfig())
         cmd = self._run_and_capture_cmd(marker, tmp_path)
-        assert "--allowedTools" not in cmd
+        # Mutable files from _make_marker target always produce --allowedTools
+        assert "--allowedTools" in cmd
+        assert "Read" in cmd
 
-    def test_no_disallowed_tools_flag_by_default(self, tmp_path):
+    def test_disallowed_tools_present_from_immutable(self, tmp_path):
+        """build_cli_permission_flags generates deny rules from immutable files."""
         from autoresearch.marker import AgentConfig
         marker = _make_marker(agent=AgentConfig())
         cmd = self._run_and_capture_cmd(marker, tmp_path)
-        assert "--disallowedTools" not in cmd
+        assert "--disallowedTools" in cmd
 
 
 # ---------------------------------------------------------------------------

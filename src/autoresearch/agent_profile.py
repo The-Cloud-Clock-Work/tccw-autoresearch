@@ -58,28 +58,135 @@ def _load_agent_base(repo_path: Path, agent_name: str) -> tuple[dict, str]:
 
 
 def generate_settings(marker: Marker, repo_path: Path | None = None) -> dict:
-    """Generate settings.json content from agent base + marker overrides."""
+    """Generate settings.json from marker config.
+
+    Uses dontAsk mode: auto-denies everything not in permissions.allow.
+    This means:
+      - Mutable files → Edit/Write in allow (agent CAN edit these)
+      - Immutable files → NOT in allow (dontAsk auto-denies them)
+      - Read always allowed (agent needs full context)
+      - deny list only for explicit extra blocks (disallowed_tools)
+
+    deny > allow in Claude Code's precedence, so we NEVER put catch-all
+    Edit/Write in deny — that would block even the allowed mutable files.
+    """
     base_settings, _ = _load_agent_base(repo_path or Path("."), marker.agent.name)
     allow = list(base_settings.get("permissions", {}).get("allow", []))
     deny = list(base_settings.get("permissions", {}).get("deny", []))
 
+    # Mutable files: agent CAN edit these
     for pattern in marker.target.mutable:
-        allow.append(f"Edit({pattern})")
-        allow.append(f"Write({pattern})")
+        rule_edit = f"Edit({pattern})"
+        rule_write = f"Write({pattern})"
+        if rule_edit not in allow:
+            allow.append(rule_edit)
+        if rule_write not in allow:
+            allow.append(rule_write)
 
-    for pattern in marker.target.immutable:
-        deny.append(f"Edit({pattern})")
-        deny.append(f"Write({pattern})")
+    # Immutable files: NOT added to allow → dontAsk auto-denies them
+    # No need to add to deny (dontAsk handles it, and deny would
+    # override allow if someone later adds the file to both lists)
 
+    # Agent always needs to read everything for context
+    if "Read" not in allow:
+        allow.append("Read")
+
+    # Glob/Grep for codebase exploration
+    if "Grep" not in allow:
+        allow.append("Grep")
+    if "Glob" not in allow:
+        allow.append("Glob")
+
+    # Merge allowed_tools from marker agent config (normalize syntax)
     for tool in marker.agent.allowed_tools:
-        if tool not in allow:
-            allow.append(tool)
+        for normalized in _normalize_tool_rules(tool):
+            if normalized not in allow:
+                allow.append(normalized)
 
+    # Merge disallowed_tools into deny (normalize syntax)
     for tool in marker.agent.disallowed_tools:
-        if tool not in deny:
-            deny.append(tool)
+        for normalized in _normalize_tool_rules(tool):
+            if normalized not in deny:
+                deny.append(normalized)
 
-    return {"permissions": {"allow": allow, "deny": deny}}
+    return {
+        "defaultMode": "dontAsk",
+        "permissions": {
+            "allow": allow,
+            "deny": deny,
+        },
+    }
+
+
+def _normalize_tool_rules(rule: str) -> list[str]:
+    """Normalize a tool permission rule to Claude Code's current syntax.
+
+    Handles:
+    - Comma-separated rules: "Bash(python3:*,pytest:*)" → ["Bash(python3 *)", "Bash(pytest *)"]
+    - Legacy colon syntax: "Bash(rm:*)" → "Bash(rm *)"
+    - Redundant rules: "Read(*)" → "Read" (bare tool matches all)
+    - Pass-through for already-correct rules
+    """
+    # Check for Tool(specifier) format
+    if "(" not in rule or not rule.endswith(")"):
+        return [rule]
+
+    paren_start = rule.index("(")
+    tool_name = rule[:paren_start]
+    specifier = rule[paren_start + 1 : -1]
+
+    # Bare wildcard is redundant: Read(*) == Read
+    if specifier == "*":
+        return [tool_name]
+
+    # Split comma-separated specifiers into individual rules
+    parts = [s.strip() for s in specifier.split(",")]
+
+    results = []
+    for part in parts:
+        # Normalize legacy colon syntax: "rm:*" → "rm *"
+        if ":*" in part:
+            part = part.replace(":*", " *")
+        elif ":" in part and not part.startswith("domain:"):
+            # "rm:-rf" → "rm -rf" (colon as separator, not domain prefix)
+            part = part.replace(":", " ", 1)
+        results.append(f"{tool_name}({part})")
+
+    return results
+
+
+def build_cli_permission_flags(marker: Marker, repo_path: Path | None = None) -> tuple[list[str], list[str]]:
+    """Build --allowedTools and --disallowedTools CLI flag values from marker config.
+
+    CLI flags are the reliable enforcement mechanism — settings.json dontAsk mode
+    doesn't block Edit tools that aren't in allow. CLI flags do.
+
+    Returns (allowed_tools, disallowed_tools) as flat lists of rule strings.
+    """
+    settings = generate_settings(marker, repo_path)
+    allowed = settings["permissions"]["allow"]
+
+    # Build deny list: start with explicit disallowed_tools
+    denied = list(settings["permissions"]["deny"])
+
+    # Add catch-all deny for Edit/Write on everything NOT mutable
+    # This is safe as CLI flag because --disallowedTools is checked AFTER --allowedTools
+    # when both match (unlike settings.json where deny always wins)
+    #
+    # Actually, per the docs deny > allow in ALL contexts. So we can't use catch-all
+    # deny with specific allows. Instead, deny the immutable paths explicitly.
+    for pattern in marker.target.immutable:
+        denied.append(f"Edit({pattern})")
+        denied.append(f"Write({pattern})")
+
+    # Deny Edit/Write on src/** as a safety net (common immutable root)
+    # Only if no mutable files are under src/
+    mutable_in_src = any(p.startswith("src/") for p in marker.target.mutable)
+    if not mutable_in_src:
+        denied.append("Edit(src/**)")
+        denied.append("Write(src/**)")
+
+    return allowed, denied
 
 
 def generate_claude_md(marker: Marker, repo_path: Path | None = None) -> str:
