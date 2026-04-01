@@ -39,4 +39,4 @@ Status can be overridden locally via `~/.autoresearch/state.json` (not committed
 
 ## File Resolution
 
-The CLI searches for `.autoresearch.yaml` starting from CWD upward. The `.autoresearch/` directory alongside it holds local config and agent profiles.
+The CLI checks for `.autoresearch/config.yaml` first (canonical path), then falls back to `.autoresearch.yaml` at the repo root (legacy). There is no upward directory traversal — the marker file must be in the specified repo path.

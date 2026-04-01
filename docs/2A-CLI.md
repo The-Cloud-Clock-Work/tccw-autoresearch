@@ -13,22 +13,33 @@ The CLI (`cli.py`) is built with Typer and Rich. Every command supports two mode
 
 | Command | Purpose |
 |---------|---------|
-| `autoresearch` | Default: show status dashboard |
-| `autoresearch run -m <marker>` | Run improvement loop for a marker |
-| `autoresearch status` | Show all tracked markers and their states |
-| `autoresearch results -m <marker>` | View experiment results |
-| `autoresearch track -m <marker>` | Start tracking a marker |
-| `autoresearch untrack -m <marker>` | Stop tracking a marker |
-| `autoresearch set-status -m <marker> -s <status>` | Override marker status locally |
+| `autoresearch` | Default: interactive home screen (marker selection, action keys) |
+| `autoresearch list` | List all tracked markers |
+| `autoresearch status -m <repo:marker>` | Show detailed status for a marker |
+| `autoresearch results -m <repo:marker>` | View experiment results |
+| `autoresearch ideas -m <repo:marker>` | View ideas backlog |
+| `autoresearch confidence -m <repo:marker>` | View statistical confidence scores |
+| `autoresearch init` | Scaffold `.autoresearch/` with default config + agent profile |
+| `autoresearch add` | Register a marker for tracking |
+| `autoresearch detach` | Unregister a marker from tracking |
+| `autoresearch skip -m <repo:marker>` | Set marker status to `skip` |
+| `autoresearch pause -m <repo:marker>` | Set marker status to `paused` |
+| `autoresearch run -m <repo:marker>` | Run improvement loop for a marker |
+| `autoresearch finalize -m <repo:marker>` | Cherry-pick + squash winning commits into clean branch |
+| `autoresearch merge -m <repo:marker>` | Merge finalized branch |
+| `autoresearch daemon start\|stop\|status\|logs` | Daemon management |
 
 ## Global Flags
 
 | Flag | Purpose |
 |------|---------|
 | `--headless` | JSON output, no TUI |
-| `--marker-file` | Path to `.autoresearch.yaml` |
 | `-h`, `--help` | Help text |
+
+## Marker ID Format
+
+Markers are referenced by full ID: `repo_name:marker_name` (e.g., `tccw-autoresearch:test-suite-health`).
 
 ## Headless Mode
 
-When `--headless` is set, all output is structured JSON via `ok_json()` / `err_json()` helpers in `cli_utils.py`. Exit codes follow standard conventions (0 = success, 1 = error).
+When `--headless` is set, all output is structured JSON via `ok_json()` / `err_json()` helpers in `cli_utils.py`. Exit codes: 0 = success, 1 = error, 2 = usage error.

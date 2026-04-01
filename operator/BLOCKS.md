@@ -193,3 +193,38 @@ Hard permission enforcement via Claude Code's permission system, telemetry captu
 - Stream-json telemetry parsed into `TelemetryReport` dataclass with 12 fields
 - `.env` loaded via `dotenv` before subprocess, not passed as CLI flags (secrets stay out of process list)
 - `--append-system-prompt-file` injects default CLAUDE.md into all agents (base rules, identity, error recovery)
+
+---
+
+## Block 6: Documentation + Onboarding Skill ▸ `done`
+
+Documentation scaffold and `/onboard` skill for frictionless repo setup.
+
+**Scope:**
+- [x] `docs/` directory with 15 files + `00-INDEX.md` covering architecture, core domain, CLI, agents, config, development
+- [x] README: Quick Start onboarding guide (install → init → configure → run)
+- [x] README + docs: Claude Code documented as hard dependency (orchestrator/agent relationship)
+- [x] `.claude/skills/onboard/` — interactive Q&A skill to set up autoresearch on any repo
+- [x] Common metric templates (pytest, jest, go, rust, coverage, build time, lint)
+
+**Completed:** 2026-04-01
+**Outputs:** `docs/`, `.claude/skills/onboard/`, updated `README.md`
+**Depends on:** Blocks 1–5 (documents existing implementation)
+
+### Sweep — 2026-04-01
+- **Issues found:** 13 (quality: 13, compliance: 4, integration: 1 — deduplicated)
+- **Fixed:** 13
+  - HIGH: `docs/2A-CLI.md` listed wrong commands (`track`/`untrack`/`set-status`) → corrected to actual CLI commands (`add`/`detach`/`skip`/`pause` + 8 missing commands)
+  - HIGH: `docs/4B-TELEMETRY.md` fabricated TSV columns → corrected to actual schema (commit, metric, guard, status, confidence, description)
+  - HIGH: `docs/0B-QUICKSTART.md` used legacy `.autoresearch.yaml` path → corrected to `.autoresearch/config.yaml`
+  - HIGH: `docs/0A-ARCHITECTURE.md` diagram attributed commit/discard to agent → corrected to orchestrator
+  - HIGH: `docs/1A-MARKER.md` claimed CWD-upward search → corrected (no upward traversal)
+  - HIGH: `01_validate_repo.sh` `.git` directory check failed on worktrees → use `git rev-parse`
+  - MEDIUM: `docs/1D-STATE.md` referenced `track`/`untrack` → corrected to `add`/`detach`
+  - MEDIUM: `docs/1B-ENGINE.md` mislabeled idea/program steps → corrected to actual flow
+  - MEDIUM: `docs/5A-TESTING.md` claimed "mock git repos" in fixtures → corrected to actual files
+  - MEDIUM: `docs/3A-AGENTS.md` described copilot as fully implemented → marked as planned
+  - MEDIUM: `operator/SPECS.md` section 1.1 still said `.autoresearch.yaml` at root → updated to canonical `.autoresearch/config.yaml`
+  - LOW: `docs/0B-QUICKSTART.md` marker `-m` didn't show full ID format → added `repo:marker` format
+  - LOW: BLOCKS.md not updated with session work → added Block 6
+- **Remaining:** 0

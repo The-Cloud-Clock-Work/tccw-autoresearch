@@ -28,4 +28,4 @@ State updates use atomic read-modify-write to prevent race conditions when multi
 
 ## Tracking
 
-Markers must be tracked in state before the engine will process them. The CLI handles tracking/untracking via `autoresearch track` and `autoresearch untrack` commands.
+Markers must be tracked in state before the engine will process them. The CLI handles this via `autoresearch add` (register) and `autoresearch detach` (unregister).

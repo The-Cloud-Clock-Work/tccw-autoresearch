@@ -18,9 +18,9 @@ Located at `.autoresearch/agents/default/`. Includes:
 - `.claude/commands/check-coverage.md` — Coverage check command
 - `.claude/skills/simplify-test/` — Test simplification skill
 
-## Copilot Agent
+## Copilot Agent (planned)
 
-Located at `.autoresearch/agents/copilot/`. A lighter-weight profile for assisted (non-autonomous) improvement.
+A lighter-weight profile for assisted (non-autonomous) improvement. Configuration exists at `.autoresearch/agents/copilot/CLAUDE.md` but the profile is not yet fully implemented.
 
 ## Profile Loading
 

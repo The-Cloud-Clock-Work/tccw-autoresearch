@@ -9,14 +9,15 @@ The engine (`engine.py`) orchestrates the core improvement loop. It creates a wo
 ## Experiment Flow
 
 1. **Setup** — Create git worktree for the marker's branch
-2. **Idea generation** — AI agent proposes an improvement
-3. **Program synthesis** — Generate concrete code changes
-4. **Harness run** — Execute the metric command on modified code
-5. **Metric extraction** — Parse the single numeric result
-6. **Guard check** — Run regression gate if configured
-7. **Decision** — Keep (commit) if improved and guard passes, discard (reset) otherwise
-8. **Record** — Append result to `results.tsv`
-9. **Loop** — Repeat until budget exhausted
+2. **Read ideas** — Load previous ideas to avoid repeating failed strategies
+3. **Generate program** — Synthesize a `program.md` with instructions for the agent
+4. **Agent execution** — Claude Code agent edits mutable files based on the program
+5. **Harness run** — Orchestrator executes the metric command on modified code
+6. **Metric extraction** — Parse the single numeric result
+7. **Guard check** — Run regression gate if configured
+8. **Decision** — Orchestrator keeps (commit) or discards (reset)
+9. **Record** — Append result to `results.tsv`
+10. **Loop** — Repeat until budget exhausted
 
 ## Escalation Strategy
 

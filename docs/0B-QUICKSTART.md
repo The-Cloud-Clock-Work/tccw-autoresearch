@@ -8,11 +8,20 @@
 pip install -e ".[dev]"
 ```
 
-Requires Python 3.10+. Dependencies: `pydantic`, `pyyaml`, `rich`, `typer`, `croniter`.
+Requires Python 3.10+, plus [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`claude` CLI) on PATH.
 
-## Create a Marker
+## Initialize Your Repo
 
-Add `.autoresearch.yaml` to your repository root:
+```bash
+cd /path/to/your-project
+autoresearch init
+```
+
+This creates `.autoresearch/config.yaml` with a starter marker and `.autoresearch/agents/` with the default agent profile.
+
+## Configure Your Marker
+
+Edit `.autoresearch/config.yaml`:
 
 ```yaml
 markers:
@@ -25,7 +34,7 @@ markers:
       immutable:
         - tests/test_main.py
     metric:
-      command: "pytest tests/test_main.py -q"
+      command: "pytest tests/test_main.py -q --tb=no 2>&1 | tail -1"
       extract: "grep -oP '\\d+(?= passed)'"
       direction: higher
       baseline: 10
@@ -39,21 +48,17 @@ markers:
 
 ```bash
 # Interactive mode
-autoresearch run -m my-first-marker
+autoresearch run -m my-project:my-first-marker
 
 # Headless mode (CI/CD, automation)
-autoresearch run -m my-first-marker --headless
+autoresearch run -m my-project:my-first-marker --headless
 ```
+
+Note: marker IDs use the format `repo_name:marker_name`.
 
 ## Check Status
 
 ```bash
-autoresearch status
-autoresearch status -m my-first-marker
-```
-
-## View Results
-
-```bash
-autoresearch results -m my-first-marker
+autoresearch status -m my-project:my-first-marker
+autoresearch results -m my-project:my-first-marker
 ```

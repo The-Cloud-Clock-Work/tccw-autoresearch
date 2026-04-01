@@ -8,13 +8,16 @@ The results module (`results.py`) tracks experiment outcomes in `results.tsv`. T
 
 ## Results Tracking
 
-Each experiment appends a row to `results.tsv` with:
+Each experiment appends a row to `results.tsv` with these columns:
 
-- Experiment number
-- Timestamp
-- Metric value (before/after)
-- Whether changes were kept or discarded
-- Commit hash (if kept)
+| Column | Description |
+|--------|-------------|
+| `commit` | Git commit hash (if kept) or `--` (if discarded) |
+| `metric` | Measured metric value |
+| `guard` | Guard result or `--` if no guard configured |
+| `status` | `kept` or `discarded` |
+| `confidence` | Statistical confidence score |
+| `description` | One-line summary of the change |
 
 ## Result Queries
 
@@ -25,9 +28,4 @@ Each experiment appends a row to `results.tsv` with:
 
 ## Telemetry
 
-The `telemetry.py` module tracks:
-
-- Total experiments run
-- Success/failure rates
-- Time and cost per experiment
-- Cumulative improvement metrics
+The `telemetry.py` module parses Claude Code's `--output-format stream-json` into a `TelemetryReport` dataclass covering tokens, cost, tools used, and errors.

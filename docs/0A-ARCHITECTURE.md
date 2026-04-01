@@ -26,11 +26,14 @@ AutoResearch is an **orchestrator**, not a code editor. The actual code changes 
 
 ```
 autoresearch (orchestrator)
-  └── claude (agent) ← hard dependency, does the actual coding
-        ├── reads mutable target files
-        ├── edits code based on improvement ideas
-        ├── runs the metric harness
-        └── commits changes if improved
+  ├── spawns claude (agent) ← hard dependency, does the actual coding
+  │     ├── reads mutable target files
+  │     ├── edits code based on improvement ideas
+  │     └── returns control to orchestrator
+  └── engine (orchestrator decides)
+        ├── runs metric harness
+        ├── evaluates improvement
+        └── git commit (keep) or git reset (discard)
 ```
 
 The engine passes each agent:

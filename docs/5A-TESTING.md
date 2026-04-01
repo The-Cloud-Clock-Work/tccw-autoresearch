@@ -38,4 +38,4 @@ pytest --cov=autoresearch
 
 ## Fixtures
 
-Shared fixtures are in `tests/fixtures/`. These include sample marker files, mock git repos, and test data.
+Shared fixtures are in `tests/fixtures/`: sample marker YAML files (`valid_marker.yaml`, `minimal_marker.yaml`, `invalid_marker.yaml`) and a stream-json sample (`stream_json_sample.jsonl`).

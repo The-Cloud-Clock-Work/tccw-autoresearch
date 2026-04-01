@@ -12,7 +12,7 @@ if [[ ! -d "$REPO_PATH" ]]; then
   exit 1
 fi
 
-if [[ ! -d "$REPO_PATH/.git" ]]; then
+if ! git -C "$REPO_PATH" rev-parse --git-dir &>/dev/null; then
   echo "ERROR: Not a git repository: $REPO_PATH" >&2
   exit 1
 fi

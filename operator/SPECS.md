@@ -5,10 +5,11 @@
 
 ---
 
-## 1. Marker File (`.autoresearch.yaml`)
+## 1. Marker File
 
 ### 1.1 Location
-- Lives in the ROOT of the target repository
+- **Canonical path:** `.autoresearch/config.yaml` (inside the `.autoresearch/` directory)
+- **Legacy fallback:** `.autoresearch.yaml` at repo root (still supported, checked second)
 - One file per repo
 - Multiple marker blocks inside a single file
 
