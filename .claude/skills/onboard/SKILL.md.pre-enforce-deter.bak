@@ -24,7 +24,7 @@ fi
 
 ---
 
-## Step 1: Get Target Repo Path (AI-JUDGMENT)
+## Step 1: Get Target Repo Path
 
 If the user provided a repo path as an argument, use it. Otherwise, ask:
 
@@ -36,7 +36,7 @@ Use AskUserQuestion:
 
 ## Step 2: Validate Target Repo
 
-<!-- DETERMINISTIC: validate the target path is a git repo with recognizable structure -->
+<!-- DETERMINISTIC: validate the target path -->
 ```bash
 "$SKILL_DIR"/scripts/01_validate_repo.sh <repo-path>
 ```
@@ -47,23 +47,33 @@ If validation fails, tell the user why and ask for a different path.
 
 ## Step 3: Check Prerequisites
 
-<!-- DETERMINISTIC: verify autoresearch and claude CLIs are available -->
+Verify that both `autoresearch` and `claude` are available:
+
 ```bash
-"$SKILL_DIR"/scripts/02_check_prerequisites.sh
+command -v autoresearch && autoresearch --version
+command -v claude && claude --version
 ```
 
-If either is missing, show the error message from the script and do NOT proceed until both are available.
+If `autoresearch` is missing, tell the user:
+> autoresearch CLI is not installed. Run `pip install -e .` from the tccw-autoresearch directory first.
+
+If `claude` is missing, tell the user:
+> Claude Code is a **hard dependency** — it's the AI agent that actually edits code.
+> Install it from: https://docs.anthropic.com/en/docs/claude-code
+
+Do NOT proceed until both are available.
 
 ---
 
-## Step 4: Run `autoresearch init`
+## Step 4: Run `autoresearch init` (AI-JUDGMENT)
 
-<!-- DETERMINISTIC: scaffold .autoresearch/ in the target repo -->
+Run `autoresearch init` in the target repo to create the `.autoresearch/` directory structure and default agent profiles:
+
 ```bash
-"$SKILL_DIR"/scripts/03_run_init.sh <repo-path>
+cd <repo-path> && autoresearch init --headless
 ```
 
-If the script outputs `EXISTS:`, inform the user that `.autoresearch/config.yaml` already exists and ask whether to add a new marker or reconfigure.
+If `.autoresearch/config.yaml` already exists, inform the user and ask whether to add a new marker or reconfigure.
 
 ---
 
@@ -142,7 +152,7 @@ Based on the improvement goal from Step 6, suggest a metric command + extract pa
 
 Present the suggested metric to the user. Explain what the command does and what the extract pulls out. Let them confirm or customize.
 
-**Important:** Offer to run the metric command right now to establish the baseline value. If the user agrees, use the baseline measurement script in Step 12.
+**Important:** Offer to run the metric command right now to establish the baseline value. If the user agrees, run it in the target repo, extract the number, and use it as `baseline`.
 
 ---
 
@@ -168,18 +178,19 @@ Show the generated YAML to the user before writing. Ask for confirmation.
 
 ---
 
-## Step 12: Measure Baseline
+## Step 12: Measure Baseline (AI-JUDGMENT)
 
-<!-- DETERMINISTIC: run the metric command and extract the baseline value -->
+Run the metric command in the target repo to establish the baseline:
+
 ```bash
-"$SKILL_DIR"/scripts/04_measure_baseline.sh <repo-path> "<metric-command>" "<extract-command>"
+cd <repo-path> && <metric.command> | <metric.extract>
 ```
 
 Update `metric.baseline` in the config with the measured value.
 
 ---
 
-## Step 13: Summary & Next Steps (AI-JUDGMENT)
+## Step 13: Summary & Next Steps
 
 Show the user:
 
@@ -215,14 +226,3 @@ Ask: "Want to run a first experiment now?"
 - The repo already has a fully configured `.autoresearch/config.yaml` with active markers
 - The user just wants to run an existing marker (use `autoresearch run` directly)
 - The user wants to edit an existing marker (edit the YAML directly)
-
----
-
-## Extracted Scripts
-
-| Script | Purpose | Idempotent |
-|--------|---------|-----------|
-| `01_validate_repo.sh` | Validate target path is a git repo with recognizable structure | Yes |
-| `02_check_prerequisites.sh` | Verify `autoresearch` and `claude` CLIs are on PATH | Yes |
-| `03_run_init.sh` | Run `autoresearch init --headless` in the target repo | Yes (skips if config exists) |
-| `04_measure_baseline.sh` | Run metric command and extract baseline number | Yes |
