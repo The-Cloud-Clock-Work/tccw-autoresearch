@@ -1,4 +1,4 @@
-# The Cloud Clock Work Autoresearch
+# tccw-autoresearch
 
 **Agnostic autonomous improvement engine.** Point it at any codebase — it makes it measurably better overnight while you sleep.
 
@@ -24,29 +24,46 @@ Works on anything with a measurable outcome: test pass rates, build times, respo
 
 ## The Marker
 
-A `.autoresearch.yaml` in any repository declares what to improve:
+A `.autoresearch/config.yaml` in any repository declares what to improve:
 
 ```yaml
 markers:
-  - name: auth-flow-reliability
-    description: Improve auth smoke test pass rate
+  - name: test-suite-health
+    description: "Improve test coverage and reduce test runtime"
     status: active
-
     target:
       mutable:
-        - src/auth/*.py
+        - tests/test_daemon.py
+        - tests/test_engine.py
       immutable:
-        - tests/test_auth.py
-
+        - src/autoresearch/daemon.py
+        - src/autoresearch/engine.py
     metric:
-      command: pytest tests/test_auth.py -q
-      extract: "(\d+) passed"
-      goal: maximize
-      baseline: 28
-
+      command: "python3 -m pytest --tb=no -q 2>&1 | tail -1"
+      extract: "grep -oP '\\d+(?= passed)'"
+      direction: higher
+      baseline: 2541
+    guard:
+      command: "python3 -m pytest --tb=short -q 2>&1"
+      extract: "grep -oP '\\d+(?= passed)'"
+      threshold: 2541
+      rework_attempts: 2
     loop:
-      max_experiments: 50
-      budget_hours: 8
+      model: sonnet
+      budget_per_experiment: 25m
+      max_experiments: 10
+    agent:
+      name: copilot
+      model: sonnet
+      permission_mode: bypassPermissions
+      allowed_tools:
+        - "Edit(tests/*)"
+        - "Bash(python3 *)"
+        - "Bash(pytest *)"
+      disallowed_tools:
+        - "Bash(rm *)"
+        - "Bash(git push *)"
+        - "Bash(curl *)"
 ```
 
 Add the file, run `autoresearch` — the engine handles the rest.
@@ -60,10 +77,23 @@ Add the file, run `autoresearch` — the engine handles the rest.
 autoresearch
 
 # Headless — for AI agents, CI/CD, cron
-autoresearch run -m auth-flow-reliability --headless
+autoresearch run -m test-suite-health --headless
 
-# Remote dispatch via agenticore, GitHub Actions, SSH — same command
-autoresearch run -m auth-flow-reliability --headless
+# Initialize .autoresearch/ in a repo with default agent profile
+autoresearch init
+
+# Status, results, confidence
+autoresearch status -m tccw-autoresearch:test-suite-health --headless
+autoresearch results -m tccw-autoresearch:test-suite-health --headless
+autoresearch confidence -m tccw-autoresearch:test-suite-health --headless
+
+# Finalize: clean branches from messy experiment history
+autoresearch finalize -m tccw-autoresearch:test-suite-health --headless
+
+# Daemon — scheduled overnight runs
+autoresearch daemon start
+autoresearch daemon status
+autoresearch daemon stop
 ```
 
 ---
@@ -76,23 +106,23 @@ autoresearch run -m auth-flow-reliability --headless
 | **Graduated escalation** | 3 failures → REFINE → 5 → PIVOT → 2 PIVOTs → SEARCH → 3 PIVOTs → HALT |
 | **Statistical confidence** | MAD-based scoring after 3+ experiments — ignores benchmark noise |
 | **Dual-gate guard** | Metric gate + regression guard — prevents gaming the metric by breaking something else |
-| **Finalization** | Clean, reviewable branch from messy experimental history |
+| **Finalization** | Clean, reviewable branches from messy experimental history |
+| **Agent profiles** | Per-marker Claude Code settings.json + CLAUDE.md generated at runtime |
+| **Permission enforcement** | Mutable/immutable translated to `--allowedTools`/`--disallowedTools` CLI flags |
+| **Telemetry** | Stream-json parsing into TelemetryReport (tokens, cost, tools, errors) |
 
 ---
 
 ## Installation
 
 ```bash
-pip install tccw-autoresearch
-```
-
-Or from source:
-
-```bash
-git clone https://github.com/nestorcolt/tccw-autoresearch
+# From source (internal)
+git clone git@github.com:The-Cloud-Clock-Work/tccw-autoresearch.git
 cd tccw-autoresearch
 pip install -e .
 ```
+
+Requires Python 3.10+ and `claude` CLI on PATH for agent invocation.
 
 ---
 
@@ -100,35 +130,55 @@ pip install -e .
 
 ```
 src/autoresearch/
-├── marker.py      # .autoresearch.yaml schema + parser (Pydantic)
-├── engine.py      # Core experiment loop
-├── worktree.py    # Git worktree isolation per marker
-├── metrics.py     # Metric extraction + confidence scoring
-├── program.py     # Runtime instruction generation for agent
-├── state.py       # Global state (~/.autoresearch/state.json)
-├── config.py      # Config defaults (~/.autoresearch/)
-├── results.py     # results.tsv read/write
-├── ideas.py       # ideas.md backlog
-├── cli.py         # CLI entry point (Block 3 — in progress)
-└── daemon.py      # Daemon service (Block 4 — planned)
+  marker.py          # .autoresearch/config.yaml schema + parser (Pydantic)
+  engine.py          # Core experiment loop + AgentRunner ABC
+  worktree.py        # Git worktree isolation per marker
+  metrics.py         # Harness execution + metric extraction + MAD confidence
+  program.py         # Runtime program.md generation (string.Template)
+  agent_profile.py   # settings.json + CLAUDE.md generation + permission flags
+  telemetry.py       # Stream-json telemetry parsing
+  finalize.py        # Cherry-pick + squash winning commits
+  cli.py             # CLI entry point (Typer, 13 commands, dual-mode)
+  cli_utils.py       # Headless helpers (JSON output, prompts)
+  daemon.py          # Daemon service (cron, double-fork, concurrent runs)
+  state.py           # Global state (~/.autoresearch/state.json)
+  config.py          # Config defaults (~/.autoresearch/config.yaml)
+  results.py         # results.tsv read/write
+  ideas.py           # ideas.md backlog
+  utils.py           # Shared utilities (parse_duration)
+  agents/default/    # Default agent profile (CLAUDE.md, settings, rules)
 ```
 
 **Design principles:**
 - **Agnostic** — no assumptions about what it improves
 - **Self-contained** — repo + marker file = everything needed to run
-- **Dual-mode** — every command works interactively AND headlessly
+- **Dual-mode** — every command works interactively AND headlessly (`--headless`)
+- **Permission-locked** — agent can only edit mutable files, enforced via CLI flags
 - **No ML dependencies** — no torch, no CUDA, no GPU
 
 ---
 
 ## Status
 
+All blocks complete. 2,541 tests passing.
+
 | Block | Description | Status |
 |-------|-------------|--------|
-| Block 1 | Marker schema, state, results | ✅ Done (143 tests) |
-| Block 2 | Engine loop, git isolation | ✅ Done |
-| Block 3 | CLI — interactive + headless | 🔲 Ready |
-| Block 4 | Daemon + packaging | 🔲 Ready |
+| Block 1 | Foundation — marker schema, state, results, ideas | Done |
+| Block 2 | Engine — loop, worktree, metrics, escalation, confidence | Done |
+| Block 3 | CLI — interactive TUI + headless JSON, 13 commands | Done |
+| Block 4 | Daemon + packaging — cron, double-fork, pip install | Done |
+| Block 5 | Agent profiles + telemetry — permissions, stream-json | Done |
+
+---
+
+## Dependencies
+
+- `pydantic>=2.0` — schema validation
+- `pyyaml>=6.0` — YAML parsing
+- `rich>=13.0` — TUI rendering
+- `typer>=0.12` — CLI framework
+- `croniter>=2.0` — cron schedule evaluation
 
 ---
 

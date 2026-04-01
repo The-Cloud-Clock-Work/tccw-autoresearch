@@ -16,11 +16,11 @@ markers:
       command: "python3 -m pytest --tb=no -q 2>&1 | tail -1"
       extract: "grep -oP '\\d+(?= passed)'"
       direction: higher
-      baseline: 281
+      baseline: 2541
     guard:
       command: "python3 -m pytest --tb=short -q 2>&1"
       extract: "grep -oP '\\d+(?= passed)'"
-      threshold: 281
+      threshold: 2541
       rework_attempts: 2
     loop:
       model: sonnet
