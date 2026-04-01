@@ -22,6 +22,32 @@ Works on anything with a measurable outcome: test pass rates, build times, respo
 
 ---
 
+## Hard Dependency: Claude Code
+
+AutoResearch does **not** edit code itself. It is an orchestrator. The actual code changes are made by [Claude Code](https://docs.anthropic.com/en/docs/claude-code) agents — Anthropic's CLI for autonomous coding.
+
+**You must have `claude` installed and on your PATH.** The engine spawns `claude` as a subprocess for each experiment, passing it the marker's mutable/immutable file rules, the agent profile, and permission flags. Claude Code reads the code, forms hypotheses, makes edits, and runs the harness. AutoResearch decides whether to keep or discard the result.
+
+```
+autoresearch (orchestrator)
+  └── claude (agent) ← does the actual coding
+        ├── reads mutable files
+        ├── edits code
+        ├── runs metric harness
+        └── commits if improved
+```
+
+Install Claude Code: https://docs.anthropic.com/en/docs/claude-code
+
+```bash
+# Verify it's available
+claude --version
+```
+
+Without `claude` on PATH, `autoresearch run` will fail.
+
+---
+
 ## The Marker
 
 A `.autoresearch/config.yaml` in any repository declares what to improve:
@@ -117,14 +143,19 @@ autoresearch daemon stop
 
 ### 1. Install the CLI
 
+**Prerequisites:**
+- Python 3.10+
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`claude` CLI) installed and authenticated — this is what actually edits code
+
 ```bash
-# Requires Python 3.10+ and `claude` CLI on PATH
+# Install autoresearch
 git clone git@github.com:The-Cloud-Clock-Work/tccw-autoresearch.git
 cd tccw-autoresearch
 pip install -e .
 
-# Verify
+# Verify both are available
 autoresearch --help
+claude --version
 ```
 
 ### 2. Initialize your target repo
