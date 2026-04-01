@@ -113,16 +113,114 @@ autoresearch daemon stop
 
 ---
 
-## Installation
+## Quick Start — Set Up Any Repo in 3 Steps
+
+### 1. Install the CLI
 
 ```bash
-# From source (internal)
+# Requires Python 3.10+ and `claude` CLI on PATH
 git clone git@github.com:The-Cloud-Clock-Work/tccw-autoresearch.git
 cd tccw-autoresearch
 pip install -e .
+
+# Verify
+autoresearch --help
 ```
 
-Requires Python 3.10+ and `claude` CLI on PATH for agent invocation.
+### 2. Initialize your target repo
+
+```bash
+cd /path/to/your-project
+autoresearch init
+```
+
+This creates `.autoresearch/config.yaml` with a starter marker and `.autoresearch/agents/` with the default agent profile.
+
+### 3. Configure your marker
+
+Edit `.autoresearch/config.yaml` to match your project:
+
+```yaml
+markers:
+  - name: my-improvement          # Pick a short, descriptive name
+    description: "What you want to improve"
+    status: active                 # Set to 'active' to run
+
+    target:
+      mutable:                     # Files the engine CAN edit
+        - src/**/*.py
+      immutable:                   # Test/harness files — NEVER touched
+        - tests/test_main.py
+
+    metric:
+      command: "pytest tests/test_main.py -q --tb=no 2>&1 | tail -1"
+      extract: "grep -oP '\\d+(?= passed)'"
+      direction: higher            # 'higher' = more is better, 'lower' = less is better
+      baseline: 10                 # Current value before any improvement
+
+    loop:
+      model: sonnet                # AI model: sonnet, opus, haiku
+      budget_per_experiment: 10m   # Time limit per experiment
+      max_experiments: 20          # Stop after N experiments
+```
+
+**Key rules for the marker:**
+- `metric.command` must be a **shell command** that produces output (not a bare regex)
+- `metric.extract` must be a **shell command** that filters the output to a single number
+- `target.immutable` files are protected — the agent cannot edit them
+- `target.mutable` files are the only ones the agent is allowed to change
+
+### Run it
+
+```bash
+# Interactive — pick marker from TUI menu
+autoresearch
+
+# Headless — for AI agents, CI/CD, cron, scripts
+autoresearch run -m my-improvement --headless
+
+# Check progress
+autoresearch status --headless
+autoresearch results -m my-improvement --headless
+```
+
+### Common marker examples
+
+**Increase test pass count:**
+```yaml
+metric:
+  command: "pytest tests/ -q --tb=no 2>&1 | tail -1"
+  extract: "grep -oP '\\d+(?= passed)'"
+  direction: higher
+  baseline: 42
+```
+
+**Reduce build time (seconds):**
+```yaml
+metric:
+  command: "bash -c 'TIMEFORMAT=%R; time make build 2>&1'"
+  extract: "tail -1"
+  direction: lower
+  baseline: 120
+```
+
+**Increase code coverage (%):**
+```yaml
+metric:
+  command: "pytest --cov=src --cov-report=term 2>&1 | tail -1"
+  extract: "grep -oP '\\d+(?=%)'"
+  direction: higher
+  baseline: 65
+```
+
+**Reduce lint warnings:**
+```yaml
+metric:
+  command: "ruff check src/ 2>&1 | tail -1"
+  extract: "grep -oP '\\d+(?= error)'"
+  direction: lower
+  baseline: 30
+```
 
 ---
 
