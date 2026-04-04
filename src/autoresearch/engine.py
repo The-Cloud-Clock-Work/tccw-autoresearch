@@ -31,6 +31,8 @@ from autoresearch.results import (
 )
 from autoresearch.state import AppState, TrackedMarker, save_state, update_state
 from autoresearch.utils import parse_duration
+from autoresearch.finalize import finalize_marker, merge_finalized
+from autoresearch.gates import run_gate_chain
 from autoresearch.worktree import (
     GitError,
     create_worktree,
@@ -90,6 +92,9 @@ class RunResult:
     final_status: str  # "completed" | "halted" | "budget_exhausted"
     branch: str
     worktree_path: str
+    auto_merged: bool = False
+    merge_target: str | None = None
+    gate_chain_summary: str | None = None
 
 
 @dataclass
@@ -499,7 +504,7 @@ def run_marker(
     final_kept = get_kept_metrics(results)
     final_conf = compute_confidence(final_kept, marker.metric.baseline, current_best)
 
-    return RunResult(
+    result = RunResult(
         marker_name=marker.name,
         experiments=kept + discarded + crashed,
         kept=kept,
@@ -511,6 +516,34 @@ def run_marker(
         branch=wt_info.branch,
         worktree_path=str(wt_info.path),
     )
+
+    # Auto-merge gate chain
+    if marker.auto_merge.enabled and result.kept > 0:
+        logger.info("Auto-merge enabled — running gate chain")
+        gate_result = run_gate_chain(repo_path, marker, result, marker.auto_merge.gates)
+        result.gate_chain_summary = gate_result.summary()
+
+        if gate_result.all_passed:
+            logger.info("All gates passed — finalizing and merging")
+            try:
+                branches = finalize_marker(
+                    repo_path, marker.name, results, wt_info.branch,
+                    target_branch=marker.auto_merge.target_branch,
+                )
+                for b in branches:
+                    merge_finalized(repo_path, b["branch"], marker.auto_merge.target_branch)
+                result.auto_merged = True
+                result.merge_target = marker.auto_merge.target_branch
+                logger.info(f"Auto-merged {len(branches)} branch(es) into {marker.auto_merge.target_branch}")
+            except Exception:
+                logger.exception("Auto-merge failed during finalize/merge")
+                result.auto_merged = False
+        else:
+            failed = [g.name for g in gate_result.gates if not g.passed]
+            logger.info(f"Gate chain failed: {', '.join(failed)}")
+            result.auto_merged = False
+
+    return result
 
 
 def _handle_guard_failure(

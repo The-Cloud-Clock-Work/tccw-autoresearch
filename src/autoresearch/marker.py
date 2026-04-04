@@ -72,6 +72,17 @@ class ResultsConfig(BaseModel):
     auto_merge: bool = False
 
 
+class AutoMerge(BaseModel):
+    enabled: bool = False
+    target_branch: str = "dev"
+    gates: list[str] = ["metric", "quality_gate", "security", "tests", "confidence"]
+    security_command: str | None = None
+    test_command: str | None = None
+    min_confidence: float = 1.0
+    push: bool = False
+    notify: list[str] = []
+
+
 class AgentConfig(BaseModel):
     name: str = "default"
     model: str = ""
@@ -94,6 +105,7 @@ class Marker(BaseModel):
     schedule: Schedule = Schedule()
     results: ResultsConfig = ResultsConfig()
     agent: AgentConfig = AgentConfig()
+    auto_merge: AutoMerge = AutoMerge()
 
 
 class MarkerFile(BaseModel):

@@ -527,6 +527,7 @@ def run_cmd(
     marker: Optional[str] = typer.Option(None, "--marker", "-m", help="Marker ID to run"),
     repo: Optional[str] = typer.Option(None, "--repo", help="Run all active markers in repo"),
     model: Optional[str] = typer.Option(None, "--model", help="Override LLM model"),
+    auto_merge: Optional[bool] = typer.Option(None, "--auto-merge/--no-auto-merge", help="Override auto_merge.enabled"),
 ):
     """Run experiment loop for a marker or all markers in a repo."""
     _init_ctx(ctx)
@@ -574,6 +575,8 @@ def run_cmd(
 
         if model:
             m.agent.model = model
+        if auto_merge is not None:
+            m.auto_merge.enabled = auto_merge
         try:
             agent_runner = get_agent_runner(m)
             run_result = engine_run(
@@ -583,7 +586,7 @@ def run_cmd(
                 tracked=t,
                 agent_runner=agent_runner,
             )
-            results_list.append({
+            r_dict = {
                 "marker": run_result.marker_name,
                 "experiments": run_result.experiments,
                 "kept": run_result.kept,
@@ -593,7 +596,11 @@ def run_cmd(
                 "final_confidence": run_result.final_confidence,
                 "final_status": run_result.final_status,
                 "branch": run_result.branch,
-            })
+                "auto_merged": run_result.auto_merged,
+                "merge_target": run_result.merge_target,
+                "gate_chain": run_result.gate_chain_summary,
+            }
+            results_list.append(r_dict)
         except EngineError as e:
             results_list.append({"marker": t.id, "error": str(e)})
 
@@ -605,6 +612,10 @@ def run_cmd(
                 console.print(f"[red]{r['marker']}: {r['error']}[/red]")
             else:
                 console.print(f"[green]{r['marker']}:[/green] {r['experiments']} experiments, {r['kept']} kept")
+                if r.get("gate_chain"):
+                    console.print(f"  Gate chain: {r['gate_chain']}")
+                if r.get("auto_merged"):
+                    console.print(f"  [green]Auto-merged into {r['merge_target']}[/green]")
 
 
 @app.command("finalize")
