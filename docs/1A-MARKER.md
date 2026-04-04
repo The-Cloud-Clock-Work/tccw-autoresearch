@@ -21,6 +21,8 @@ Each marker contains these sections:
 | `loop` | Model, budget, max experiments, cost limit |
 | `escalation` | Failure thresholds for refine/pivot/search/halt |
 | `schedule` | overnight, weekend, on-demand, or cron |
+| `auto_merge` | Gate chain, merge target, push/PR flags, lifecycle hooks |
+| `agent` | Model, effort, permission mode, allowed/disallowed tools |
 | `results` | Branch prefix, notifications, auto-merge |
 
 ## Marker States
@@ -36,6 +38,24 @@ Each marker contains these sections:
 ## State Override
 
 Status can be overridden locally via `~/.autoresearch/state.json` (not committed). Local override takes precedence over YAML.
+
+## Auto-Merge Section
+
+The `auto_merge` section controls what happens after all experiments complete:
+
+| Field | Type | Default | Purpose |
+|-------|------|---------|---------|
+| `enabled` | bool | `false` | Enable post-experiment gate chain + merge |
+| `target_branch` | str | `"dev"` | Branch to merge kept changes into |
+| `gates` | list[str] | `["security", "tests", "confidence"]` | Gate chain to run before merge |
+| `security_command` | str? | `null` | Shell command for security gate |
+| `test_command` | str? | `null` | Shell command for test gate |
+| `min_confidence` | float | `1.0` | Minimum confidence score to pass |
+| `push_to_remote` | bool | `false` | `git push origin <target_branch>` after merge |
+| `create_pr` | bool | `false` | `gh pr create` after push (independent of push_to_remote) |
+| `snapshot_command` | str? | `null` | Shell command to run before each experiment (see [Engine Hooks](1B-ENGINE.md#lifecycle-hooks)) |
+| `restore_command` | str? | `null` | Shell command to run on experiment failure (see [Engine Hooks](1B-ENGINE.md#lifecycle-hooks)) |
+| `notify` | list[str] | `[]` | Notification targets |
 
 ## File Resolution
 

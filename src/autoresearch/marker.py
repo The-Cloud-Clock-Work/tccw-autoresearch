@@ -81,6 +81,8 @@ class AutoMerge(BaseModel):
     min_confidence: float = 1.0
     push_to_remote: bool = False
     create_pr: bool = False
+    snapshot_command: str | None = None
+    restore_command: str | None = None
     notify: list[str] = []
 
 

@@ -317,6 +317,7 @@ def run_marker(
     try:
         for exp_num in range(1, max_experiments + 1):
             esc.current_experiment = exp_num
+            snapshot_ref = _run_snapshot(repo_path, marker, exp_num)
 
             # Check for HALT
             if esc.escalation_level == "halt":
@@ -372,6 +373,7 @@ def run_marker(
                 crashed += 1
                 esc.on_crash()
                 _reset_to_before_commit(wt_info.path, commit_hash)
+                _run_restore(repo_path, marker, snapshot_ref)
                 append_result(wt_info.path, marker.name, ExperimentResult(
                     commit=commit_hash,
                     metric=0,
@@ -391,6 +393,7 @@ def run_marker(
                 discarded += 1
                 esc.on_discard()
                 _reset_to_before_commit(wt_info.path, commit_hash)
+                _run_restore(repo_path, marker, snapshot_ref)
                 _write_discard_idea(wt_info.path, marker.name, agent_result.description, new_metric)
                 _write_telemetry_feedback(wt_info.path, marker.name, agent_result)
                 append_result(wt_info.path, marker.name, ExperimentResult(
@@ -425,6 +428,7 @@ def run_marker(
                         discarded += 1
                         esc.on_discard()
                         _reset_to_before_commit(wt_info.path, commit_hash)
+                        _run_restore(repo_path, marker, snapshot_ref)
                         guard_status = "fail"
                         append_result(wt_info.path, marker.name, ExperimentResult(
                             commit=commit_hash,
@@ -665,6 +669,50 @@ def _reset_to_before_commit(worktree_path: Path, commit_hash: str) -> None:
         git_reset_hard(worktree_path, f"{commit_hash}~1")
     except GitError as e:
         logger.warning(f"Could not reset to {commit_hash}~1: {e}")
+
+
+def _run_snapshot(repo_path: Path, marker: Marker, exp_num: int) -> str | None:
+    """Run pre-experiment snapshot command if configured. Returns snapshot ID."""
+    cmd = marker.auto_merge.snapshot_command
+    if not cmd:
+        return None
+    try:
+        expanded = cmd.replace("{exp_num}", str(exp_num))
+        result = subprocess.run(
+            ["bash", "-c", expanded],
+            cwd=repo_path, capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode == 0:
+            snap_id = result.stdout.strip().split("\n")[-1]
+            logger.info(f"Pre-experiment snapshot: {snap_id}")
+            return snap_id
+        logger.warning(f"Snapshot command failed (rc={result.returncode}): {result.stderr[:200]}")
+    except subprocess.TimeoutExpired:
+        logger.warning("Snapshot command timed out (120s)")
+    except Exception as e:
+        logger.warning(f"Snapshot command error: {e}")
+    return None
+
+
+def _run_restore(repo_path: Path, marker: Marker, snapshot_ref: str | None) -> None:
+    """Run restore command if snapshot exists."""
+    cmd = marker.auto_merge.restore_command
+    if not cmd or not snapshot_ref:
+        return
+    try:
+        expanded = cmd.replace("{snapshot_id}", snapshot_ref)
+        result = subprocess.run(
+            ["bash", "-c", expanded],
+            cwd=repo_path, capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode == 0:
+            logger.info(f"Restore completed for snapshot {snapshot_ref}")
+        else:
+            logger.warning(f"Restore failed (rc={result.returncode}): {result.stderr[:200]}")
+    except subprocess.TimeoutExpired:
+        logger.warning("Restore command timed out (120s)")
+    except Exception as e:
+        logger.warning(f"Restore command error: {e}")
 
 
 def _target_reached(marker: Marker, current: float) -> bool:
