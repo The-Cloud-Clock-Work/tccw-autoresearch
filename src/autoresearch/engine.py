@@ -567,7 +567,12 @@ def _create_promotion_pr(
     This creates the PR automatically — operator clicks approve to merge.
     """
     try:
-        # Push dev first (if push is enabled or we're creating a PR)
+        # Only push if auto_merge.push is True — otherwise PR creation will fail
+        # but that's expected when running locally without push permissions
+        if not marker.auto_merge.push:
+            logger.info("push=false — skipping git push and PR creation (local-only merge)")
+            return
+
         subprocess.run(
             ["git", "push", "origin", source],
             cwd=repo_path, capture_output=True, text=True, timeout=60,

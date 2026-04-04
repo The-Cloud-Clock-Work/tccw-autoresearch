@@ -3,7 +3,12 @@
     "allow": [
       "Read(*)",
       "Glob(*)",
-      "Grep(*)"
+      "Grep(*)",
+      "Edit(*)",
+      "Write(*)",
+      "Bash(python3 *)",
+      "Bash(pytest *)",
+      "Bash(ruff *)"
     ],
     "deny": [
       "Bash(rm -rf *)",
