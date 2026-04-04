@@ -209,8 +209,12 @@ class ClaudeCodeRunner(AgentRunner):
 
         cmd.extend(self.agent_config.extra_flags)
 
-        # Load .env from agent dir if it exists
+        # Load env from agent profile settings.json (OTEL, telemetry, etc.)
         env = dict(os.environ)
+        if paths.env:
+            env.update(paths.env)
+
+        # Load .env from agent dir if it exists (overrides settings.json env)
         dot_env = paths.agent_dir / ".env"
         if dot_env.is_file():
             for line in dot_env.read_text().splitlines():

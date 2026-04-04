@@ -22,6 +22,7 @@ class AgentPaths:
     logs_dir: Path
     stream_log_path: Path
     debug_log_path: Path
+    env: dict
 
 
 def resolve_agent_dir(repo_path: Path, agent_name: str) -> Path | None:
@@ -35,12 +36,14 @@ def resolve_agent_dir(repo_path: Path, agent_name: str) -> Path | None:
     return None
 
 
-def _load_agent_base(repo_path: Path, agent_name: str) -> tuple[dict, str]:
+def _load_agent_base(repo_path: Path, agent_name: str) -> tuple[dict, str, dict]:
     """Load settings.json and CLAUDE.md from the named agent profile.
 
     Resolution order:
     1. .autoresearch/agents/<name>/ in the repo
     2. src/autoresearch/agents/default/ (shipped default)
+
+    Returns (settings_dict, claude_md_string, env_dict).
     """
     repo_dir = resolve_agent_dir(repo_path, agent_name)
     if repo_dir:
@@ -54,7 +57,9 @@ def _load_agent_base(repo_path: Path, agent_name: str) -> tuple[dict, str]:
     claude_md_path = base_dir / "CLAUDE.md"
     claude_md = claude_md_path.read_text() if claude_md_path.is_file() else ""
 
-    return settings, claude_md
+    agent_env = settings.get("env", {})
+
+    return settings, claude_md, agent_env
 
 
 def generate_settings(marker: Marker, repo_path: Path | None = None) -> dict:
@@ -70,7 +75,7 @@ def generate_settings(marker: Marker, repo_path: Path | None = None) -> dict:
     deny > allow in Claude Code's precedence, so we NEVER put catch-all
     Edit/Write in deny — that would block even the allowed mutable files.
     """
-    base_settings, _ = _load_agent_base(repo_path or Path("."), marker.agent.name)
+    base_settings, _, _ = _load_agent_base(repo_path or Path("."), marker.agent.name)
     allow = list(base_settings.get("permissions", {}).get("allow", []))
     deny = list(base_settings.get("permissions", {}).get("deny", []))
 
@@ -191,7 +196,7 @@ def build_cli_permission_flags(marker: Marker, repo_path: Path | None = None) ->
 
 def generate_claude_md(marker: Marker, repo_path: Path | None = None) -> str:
     """Generate CLAUDE.md from agent base + marker-specific context."""
-    _, base_md = _load_agent_base(repo_path or Path("."), marker.agent.name)
+    _, base_md, _ = _load_agent_base(repo_path or Path("."), marker.agent.name)
 
     lines = [base_md.rstrip(), ""]
     lines.append(f"# Marker: {marker.name}")
@@ -287,6 +292,9 @@ def ensure_agent_dir(
     if marker.agent.name != "default":
         link_agent_defaults(agent_dir, DEFAULT_AGENT_DIR)
 
+    # Load env vars from agent profile settings.json (OTEL, etc.)
+    _, _, agent_env = _load_agent_base(worktree_path, marker.agent.name)
+
     ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
 
     return AgentPaths(
@@ -296,4 +304,5 @@ def ensure_agent_dir(
         logs_dir=logs_dir,
         stream_log_path=logs_dir / f"run-{ts}.jsonl",
         debug_log_path=logs_dir / f"debug-{ts}.log",
+        env=agent_env,
     )
