@@ -295,6 +295,18 @@ def ensure_agent_dir(
     # Load env vars from agent profile settings.json (OTEL, etc.)
     _, _, agent_env = _load_agent_base(worktree_path, marker.agent.name)
 
+    # Write settings.local.json to worktree .claude/ so Claude Code reads
+    # the env block (OTEL, telemetry). Claude reads this at startup, not
+    # process env vars.
+    if agent_env:
+        local_settings_path = worktree_path / ".claude" / "settings.local.json"
+        local_settings_path.parent.mkdir(parents=True, exist_ok=True)
+        local_settings = {}
+        if local_settings_path.is_file():
+            local_settings = json.loads(local_settings_path.read_text())
+        local_settings["env"] = agent_env
+        local_settings_path.write_text(json.dumps(local_settings, indent=2))
+
     ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
 
     return AgentPaths(
