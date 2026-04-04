@@ -219,6 +219,8 @@ class ClaudeCodeRunner(AgentRunner):
                     key, _, value = line.partition("=")
                     env[key.strip()] = value.strip()
 
+        logger.info(f"Agent cmd: {' '.join(cmd[:6])}...")
+        logger.debug(f"Agent cwd: {paths.agent_dir}")
         try:
             result = subprocess.run(
                 cmd,
@@ -230,6 +232,8 @@ class ClaudeCodeRunner(AgentRunner):
                 env=env,
             )
             output = result.stdout or ""
+            if result.returncode != 0:
+                logger.warning(f"Agent exit code {result.returncode}: {(result.stderr or '')[:500]}")
 
             # Save stream-json log
             if output:
