@@ -536,8 +536,18 @@ def run_marker(
                 result.merge_target = marker.auto_merge.target_branch
                 logger.info(f"Auto-merged {len(branches)} branch(es) into {marker.auto_merge.target_branch}")
 
-                # Create PR to main for operator approval (dev → main gate)
-                if marker.auto_merge.target_branch != "main":
+                # Close the feedback loop: update STATE.md
+                _run_state_update(repo_path)
+
+                # Push and/or create PR based on independent flags
+                if marker.auto_merge.push_to_remote:
+                    subprocess.run(
+                        ["git", "push", "origin", marker.auto_merge.target_branch],
+                        cwd=repo_path, capture_output=True, text=True, timeout=60,
+                    )
+                    logger.info(f"Pushed {marker.auto_merge.target_branch} to origin")
+
+                if marker.auto_merge.create_pr and marker.auto_merge.target_branch != "main":
                     _create_promotion_pr(
                         repo_path, marker, result,
                         source=marker.auto_merge.target_branch,
@@ -554,6 +564,22 @@ def run_marker(
     return result
 
 
+def _run_state_update(repo_path: Path) -> None:
+    """Run state-update.sh to close the feedback loop after merge."""
+    script = repo_path / "automation" / "state-update.sh"
+    if not script.exists():
+        logger.debug(f"No state-update.sh found at {script}")
+        return
+    try:
+        subprocess.run(
+            ["bash", str(script), str(repo_path)],
+            cwd=repo_path, capture_output=True, text=True, timeout=30,
+        )
+        logger.info("State update completed — feedback loop closed")
+    except Exception:
+        logger.warning("state-update.sh failed — feedback loop open")
+
+
 def _create_promotion_pr(
     repo_path: Path,
     marker: "Marker",
@@ -567,17 +593,6 @@ def _create_promotion_pr(
     This creates the PR automatically — operator clicks approve to merge.
     """
     try:
-        # Only push if auto_merge.push is True — otherwise PR creation will fail
-        # but that's expected when running locally without push permissions
-        if not marker.auto_merge.push:
-            logger.info("push=false — skipping git push and PR creation (local-only merge)")
-            return
-
-        subprocess.run(
-            ["git", "push", "origin", source],
-            cwd=repo_path, capture_output=True, text=True, timeout=60,
-        )
-
         title = f"[autoresearch] {marker.name}: {result.kept} improvements ({result.final_metric})"
         body = (
             f"## Autoresearch Auto-Promotion\n\n"

@@ -75,11 +75,12 @@ class ResultsConfig(BaseModel):
 class AutoMerge(BaseModel):
     enabled: bool = False
     target_branch: str = "dev"
-    gates: list[str] = ["metric", "quality_gate", "security", "tests", "confidence"]
+    gates: list[str] = ["security", "tests", "confidence"]
     security_command: str | None = None
     test_command: str | None = None
     min_confidence: float = 1.0
-    push: bool = False
+    push_to_remote: bool = False
+    create_pr: bool = False
     notify: list[str] = []
 
 
