@@ -13,7 +13,7 @@
 
 Build a standalone CLI + daemon that implements the Karpathy autoresearch loop pattern for any codebase. The engine is agnostic -- it knows files, metrics, git, and loops. Nothing else.
 
-**Core architectural principle:** The repo is self-contained. The `.autoresearch.yaml` marker file carries everything. The CLI reads it from the repo, generates agent instructions at runtime, executes in the repo's worktree. No external payloads. No special integrations. Any system that can run `autoresearch run -m <marker> --headless` in a cloned repo is an execution environment -- local terminal, agenticore, GitHub Actions, SSH, cron.
+**Core architectural principle:** The repo is self-contained. The `.autoresearch/config.yaml` marker file carries everything. The CLI reads it from the repo, generates agent instructions at runtime, executes in the repo's worktree. No external payloads. No special integrations. Any system that can run `autoresearch run -m <marker> --headless` in a cloned repo is an execution environment -- local terminal, agenticore, GitHub Actions, SSH, cron.
 
 ---
 
@@ -92,14 +92,14 @@ tccw-autoresearch/
 |       +-- cli.py           # CLI entry point (interactive + headless)
 |       +-- daemon.py        # Daemon service
 |       +-- engine.py        # Core experiment loop
-|       +-- marker.py        # .autoresearch.yaml parser + schema
+|       +-- marker.py        # `.autoresearch/config.yaml` parser + schema
 |       +-- worktree.py      # Git worktree management
 |       +-- metrics.py       # Metric extraction + comparison
 |       +-- results.py       # Results tracking (results.tsv)
 |       +-- config.py        # Global config (~/.autoresearch/)
 |       +-- state.py         # State management (state.json)
 +-- tests/
-+-- .autoresearch.yaml       # Dogfood -- markers for self-improvement
++-- `.autoresearch/config.yaml`       # Dogfood -- markers for self-improvement
 ```
 
 ---
@@ -118,7 +118,7 @@ tccw-autoresearch/
 
 - Python 3.10+
 - `typer` or `click` -- CLI framework
-- `pydantic` -- schema validation for `.autoresearch.yaml`
+- `pydantic` -- schema validation for `.autoresearch/config.yaml`
 - `rich` -- TUI rendering (tables, status indicators, menus)
 - `gitpython` or subprocess git -- worktree management
 - No ML dependencies. No torch. No CUDA. No GPU.

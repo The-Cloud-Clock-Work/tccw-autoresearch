@@ -2374,9 +2374,10 @@ class TestIsDueExtended:
         assert is_due(self._make_schedule("cron", "* * * * *"), old, now) is True
 
     def test_cron_every_minute_with_very_recent_run_not_due(self):
-        now = datetime.now(timezone.utc)
+        # Use a fixed time mid-minute to avoid boundary flakiness
+        now = datetime(2026, 6, 15, 12, 0, 30, tzinfo=timezone.utc)
         recent = (now - timedelta(seconds=5)).isoformat()
-        # next fire is 55 seconds away, not due yet
+        # next fire is 30 seconds away, not due yet
         assert is_due(self._make_schedule("cron", "* * * * *"), recent, now) is False
 
     def test_invalid_cron_expression_returns_false(self):

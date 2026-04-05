@@ -1,4 +1,4 @@
-"""Marker schema and .autoresearch.yaml parser."""
+"""Marker schema and .autoresearch/config.yaml parser."""
 
 from __future__ import annotations
 
@@ -117,14 +117,14 @@ class MarkerFile(BaseModel):
 
 
 def load_markers(path: Path) -> MarkerFile:
-    """Read .autoresearch.yaml, validate, return typed MarkerFile."""
+    """Read .autoresearch/config.yaml, validate, return typed MarkerFile."""
     with open(path) as f:
         data = yaml.safe_load(f)
     return MarkerFile.model_validate(data)
 
 
 def find_marker_file(repo_path: Path) -> Path | None:
-    """Search for marker config. Checks .autoresearch/config.yaml first, then .autoresearch.yaml."""
+    """Search for marker config. Checks .autoresearch/config.yaml first, then .autoresearch.yaml (legacy)."""
     new_path = repo_path / CONFIG_DIR / CONFIG_FILENAME
     if new_path.is_file():
         return new_path

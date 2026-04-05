@@ -15,7 +15,7 @@ The daemon (`daemon.py`) runs as a background service, monitoring tracked marker
 
 ## Scheduling
 
-Markers declare their schedule in `.autoresearch.yaml`:
+Markers declare their schedule in `.autoresearch/config.yaml`:
 
 | Type | When |
 |------|------|

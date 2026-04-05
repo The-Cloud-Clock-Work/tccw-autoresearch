@@ -19,7 +19,7 @@ Located at `~/.autoresearch/state.json`. Contains:
 
 - Tracked markers and their effective statuses
 - Experiment history references
-- Local status overrides (take precedence over `.autoresearch.yaml`)
+- Local status overrides (take precedence over `.autoresearch/config.yaml`)
 
 ## Atomic Operations
 
@@ -30,7 +30,7 @@ State updates use atomic read-modify-write to prevent race conditions when multi
 ```
 1. Check state.json for local override
 2. If found → use override
-3. If not → use status from .autoresearch.yaml
+3. If not → use status from `.autoresearch/config.yaml`
 ```
 
 ## Tracking

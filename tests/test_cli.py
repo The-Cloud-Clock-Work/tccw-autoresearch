@@ -875,7 +875,7 @@ class TestInteractiveAdd:
         with patch("autoresearch.cli.find_marker_file", return_value=None):
             result = runner.invoke(app, ["add", "--path", str(tmp_path)])
         assert result.exit_code == 1
-        assert "No .autoresearch.yaml" in result.output
+        assert "No .autoresearch/config.yaml" in result.output
 
     def test_bad_marker_file_exits_1(self, tmp_path):
         with (

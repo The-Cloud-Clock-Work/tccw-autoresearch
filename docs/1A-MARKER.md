@@ -7,11 +7,11 @@ nav_order: 10
 
 # Marker
 
-> `.autoresearch.yaml` schema, marker states, and lifecycle.
+> `.autoresearch/config.yaml` schema, marker states, and lifecycle.
 
 ## Overview
 
-The marker is the central interface between human intent and autonomous execution. A `.autoresearch.yaml` file in any repository declares one or more markers, each defining what to improve, how to measure it, and what constraints apply.
+The marker is the central interface between human intent and autonomous execution. A `.autoresearch/config.yaml` file in any repository declares one or more markers, each defining what to improve, how to measure it, and what constraints apply.
 
 ## Schema
 
@@ -66,4 +66,4 @@ The `auto_merge` section controls what happens after all experiments complete:
 
 ## File Resolution
 
-The CLI checks for `.autoresearch/config.yaml` first (canonical path), then falls back to `.autoresearch.yaml` at the repo root (legacy). There is no upward directory traversal — the marker file must be in the specified repo path.
+The CLI checks for `.autoresearch/config.yaml` first (canonical path), then falls back to `.autoresearch/config.yaml` at the repo root (legacy). There is no upward directory traversal — the marker file must be in the specified repo path.

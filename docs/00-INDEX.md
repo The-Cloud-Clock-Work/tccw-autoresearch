@@ -17,7 +17,7 @@ nav_order: 1
 ## Core Domain
 | File | Topic |
 |------|-------|
-| [1A-MARKER.md](1A-MARKER.md) | .autoresearch.yaml schema, marker states, lifecycle |
+| [1A-MARKER.md](1A-MARKER.md) | `.autoresearch/config.yaml` schema, marker states, lifecycle |
 | [1B-ENGINE.md](1B-ENGINE.md) | Experiment loop, escalation, commit/discard logic |
 | [1C-METRICS.md](1C-METRICS.md) | Metric extraction, guard gates, dual-gate verification |
 | [1D-STATE.md](1D-STATE.md) | state.json, local overrides, atomic read-modify-write |

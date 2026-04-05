@@ -52,7 +52,7 @@ Without `claude` on PATH, the engine cannot run experiments.
 
 ## Key Design Principles
 
-- **The repo is the engine** — `.autoresearch.yaml` carries everything needed to run
+- **The repo is the engine** — `.autoresearch/config.yaml` carries everything needed to run
 - **Agnostic** — no stack-specific, provider-specific, or infrastructure-specific code
 - **Dual-mode CLI** — every command works interactively (TUI) and headlessly (JSON)
 - **Marker-driven** — markers declare what to improve; the engine executes
@@ -64,7 +64,7 @@ Without `claude` on PATH, the engine cannot run experiments.
 |--------|---------|
 | `cli.py` | CLI entry point (Typer + Rich) |
 | `engine.py` | Core experiment loop |
-| `marker.py` | `.autoresearch.yaml` parser + Pydantic schema |
+| `marker.py` | `.autoresearch/config.yaml` parser + Pydantic schema |
 | `metrics.py` | Metric extraction + guard gates |
 | `state.py` | `state.json` management |
 | `worktree.py` | Git worktree lifecycle |
@@ -79,7 +79,7 @@ Without `claude` on PATH, the engine cannot run experiments.
 ## Data Flow
 
 ```
-.autoresearch.yaml → marker.py → engine.py → worktree.py (isolate)
+`.autoresearch/config.yaml` → marker.py → engine.py → worktree.py (isolate)
                                      ↓
                               metrics.py (measure)
                                      ↓

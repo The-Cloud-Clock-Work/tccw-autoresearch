@@ -444,7 +444,7 @@ markers:
 @app.command("add")
 def add_cmd(
     ctx: typer.Context,
-    path: Path = typer.Option(..., "--path", help="Path to repo containing .autoresearch.yaml"),
+    path: Path = typer.Option(..., "--path", help="Path to repo containing .autoresearch/config.yaml"),
 ):
     """Register markers from a repo."""
     _init_ctx(ctx)
@@ -452,9 +452,9 @@ def add_cmd(
     mf_path = find_marker_file(repo_path)
     if not mf_path:
         if is_headless(ctx):
-            headless_output(ctx, err_json(f"No .autoresearch.yaml found in {repo_path}"))
+            headless_output(ctx, err_json(f"No .autoresearch/config.yaml found in {repo_path}"))
             raise typer.Exit(code=1)
-        console.print(f"[red]No .autoresearch.yaml found in {repo_path}[/red]")
+        console.print(f"[red]No .autoresearch/config.yaml found in {repo_path}[/red]")
         raise typer.Exit(code=1)
 
     try:
@@ -749,7 +749,7 @@ def _interactive_main(ctx: typer.Context):
     while True:
         state = _load_state(ctx)
 
-        # Context detection: are we in a repo with .autoresearch.yaml?
+        # Context detection: are we in a repo with .autoresearch/config.yaml?
         cwd = Path.cwd()
         marker_file_path = find_marker_file(cwd)
 
@@ -839,7 +839,7 @@ def _action_add(ctx: typer.Context, repo_path: Path):
     """Register markers from a repo path."""
     mf_path = find_marker_file(repo_path)
     if not mf_path:
-        console.print(f"[red]No .autoresearch.yaml found in {repo_path}[/red]")
+        console.print(f"[red]No .autoresearch/config.yaml found in {repo_path}[/red]")
         return
 
     try:
