@@ -2,14 +2,14 @@
 layout: home
 title: Home
 nav_order: 1
-description: "AutoResearch — Agnostic autonomous improvement engine."
+description: "AutoResearch — A Claude Code wrapper that makes any codebase measurably better overnight."
 permalink: /
 ---
 
 # AutoResearch
 {: .fs-9 .fw-700 }
 
-Point it at any codebase — it makes it measurably better overnight while you sleep.
+A Claude Code wrapper that makes any codebase measurably better overnight.
 {: .fs-5 .text-grey-dk-100 .mb-6 }
 
 <div class="hero-actions text-center mb-8" markdown="0">
@@ -21,19 +21,21 @@ Point it at any codebase — it makes it measurably better overnight while you s
 
 ---
 
-## What It Does
+## What Is This?
+
+AutoResearch is an orchestrator built on top of [Claude Code](https://docs.anthropic.com/en/docs/claude-code). You define a metric. Claude does the coding. AutoResearch decides what to keep.
 
 ```
-LOOP:
-  1. Edit target files (Claude Code agent)
-  2. Run immutable harness (your metric command)
-  3. Measure single metric (extract a number)
-  4. If improved → keep (git commit)
-  5. If worse   → discard (git reset)
-  6. REPEAT until budget exhausted
+autoresearch (orchestrator)
+  └── claude (the brain)
+        ├── reads your code
+        ├── forms a hypothesis
+        ├── edits files
+        ├── runs your metric
+        └── commits if improved, reverts if not
 ```
 
-Works on anything with a measurable outcome: lint errors, test pass rates, build times, coverage percentages, response latency. **No GPU. No ML. Tests replace training runs.**
+Reduce lint errors. Increase test coverage. Cut build times. Fix code smells. **Anything you can measure with a shell command.**
 
 ---
 
@@ -46,7 +48,7 @@ cd your-project
 autoresearch init
 ```
 
-Claude opens interactively, scans your project, asks what to improve, configures the marker, measures baseline. Three commands from zero to running.
+Claude opens interactively, scans your project, asks what to improve, configures the marker, measures baseline. **Three commands from zero to running.**
 
 **Prerequisites:** Python 3.10+ and [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed.
 
@@ -76,18 +78,17 @@ The engine creates a git worktree, spawns a Claude Code agent, measures before/a
 
 ---
 
-## Key Features
+## Production Results
 
-| Feature | Description |
-|---------|-------------|
-| **Any metric** | Shell command → extract number → direction. That's it. |
-| **Agent profiles** | Default agent ships with the package. Duplicate to customize. |
-| **Budget countdown** | Agent sees remaining time after every tool call. |
-| **Auto-merge** | Kept experiments → PR to dev → promotion PR to main. |
-| **Graduated escalation** | 3 fails → refine → 5 → pivot → search → halt |
-| **Statistical confidence** | MAD-based scoring after 3+ experiments |
-| **Claude Code skills** | `/onboard` wizard + `/autoresearch` status/logs |
-| **Dual-mode CLI** | Interactive TUI + headless JSON (`--headless`) |
+Deployed on antoncore (3.3k LOC Python monorepo):
+
+| Cycle | Before | After | Delta |
+|-------|--------|-------|-------|
+| 1 | 186 errors | 163 | -23 |
+| 2 | 163 | 133 | -30 |
+| 3 | 133 | 0 | -133 |
+
+**186 → 0 ruff errors in 3 cycles.** Full GitHub PR audit trail.
 
 ---
 
@@ -100,5 +101,7 @@ The engine creates a git worktree, spawns a Claude Code agent, measures before/a
 | [Engine]({{ site.baseurl }}/docs/1B-ENGINE/) | Experiment loop, escalation |
 | [CLI]({{ site.baseurl }}/docs/2A-CLI/) | 13 commands, interactive + headless |
 | [Agents]({{ site.baseurl }}/docs/3A-AGENTS/) | Default agent, custom profiles |
+| [Budget Countdown]({{ site.baseurl }}/docs/3C-BUDGET-COUNTDOWN/) | PostToolUse time awareness |
 | [Gates]({{ site.baseurl }}/docs/1E-GATES/) | Gate chain, auto-publish PRs |
-| [Production]({{ site.baseurl }}/docs/6B-PRODUCTION-DEPLOYMENT/) | Step-by-step deployment |
+| [Ruff Harness]({{ site.baseurl }}/docs/6A-HARNESS-RUFF/) | Production reference |
+| [Production Deployment]({{ site.baseurl }}/docs/6B-PRODUCTION-DEPLOYMENT/) | Step-by-step guide |

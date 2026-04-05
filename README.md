@@ -1,145 +1,6 @@
 # tccw-autoresearch
 
-**Agnostic autonomous improvement engine.** Point it at any codebase — it makes it measurably better overnight while you sleep.
-
-Inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch) — methodology only, zero code dependency. Clean-room implementation of the loop pattern, stripped of all ML assumptions.
-
----
-
-## What It Does
-
-```
-LOOP:
-  1. Edit target files
-  2. Run immutable harness
-  3. Measure single metric
-  4. If improved → keep (git commit)
-  5. If worse  → discard (git reset)
-  6. REPEAT until budget exhausted
-```
-
-Works on anything with a measurable outcome: test pass rates, build times, response latency, error counts, coverage percentages. No GPU. No ML. Tests replace training runs.
-
----
-
-## Hard Dependency: Claude Code
-
-AutoResearch does **not** edit code itself. It is an orchestrator. The actual code changes are made by [Claude Code](https://docs.anthropic.com/en/docs/claude-code) agents — Anthropic's CLI for autonomous coding.
-
-**You must have `claude` installed and on your PATH.** The engine spawns `claude` as a subprocess for each experiment, passing it the marker's mutable/immutable file rules, the agent profile, and permission flags. Claude Code reads the code, forms hypotheses, makes edits, and runs the harness. AutoResearch decides whether to keep or discard the result.
-
-```
-autoresearch (orchestrator)
-  └── claude (agent) ← does the actual coding
-        ├── reads mutable files
-        ├── edits code
-        ├── runs metric harness
-        └── commits if improved
-```
-
-Install Claude Code: https://docs.anthropic.com/en/docs/claude-code
-
-```bash
-# Verify it's available
-claude --version
-```
-
-Without `claude` on PATH, `autoresearch run` will fail.
-
----
-
-## The Marker
-
-A `.autoresearch/config.yaml` in any repository declares what to improve:
-
-```yaml
-markers:
-  - name: test-suite-health
-    description: "Improve test coverage and reduce test runtime"
-    status: active
-    target:
-      mutable:
-        - tests/test_daemon.py
-        - tests/test_engine.py
-      immutable:
-        - src/autoresearch/daemon.py
-        - src/autoresearch/engine.py
-    metric:
-      command: "python3 -m pytest --tb=no -q 2>&1 | tail -1"
-      extract: "grep -oP '\\d+(?= passed)'"
-      direction: higher
-      baseline: 2541
-    guard:
-      command: "python3 -m pytest --tb=short -q 2>&1"
-      extract: "grep -oP '\\d+(?= passed)'"
-      threshold: 2541
-      rework_attempts: 2
-    loop:
-      model: sonnet
-      budget_per_experiment: 25m
-      max_experiments: 10
-    agent:
-      name: copilot
-      model: sonnet
-      permission_mode: bypassPermissions
-      allowed_tools:
-        - "Edit(tests/*)"
-        - "Bash(python3 *)"
-        - "Bash(pytest *)"
-      disallowed_tools:
-        - "Bash(rm *)"
-        - "Bash(git push *)"
-        - "Bash(curl *)"
-```
-
-Add the file, run `autoresearch` — the engine handles the rest.
-
----
-
-## Usage
-
-```bash
-# Interactive TUI (select marker, press 'r' to run)
-autoresearch
-
-# Headless — for AI agents, CI/CD, cron
-autoresearch run -m test-suite-health --headless
-
-# Initialize .autoresearch/ in a repo with default agent profile
-autoresearch init
-
-# Status, results, confidence
-autoresearch status -m tccw-autoresearch:test-suite-health --headless
-autoresearch results -m tccw-autoresearch:test-suite-health --headless
-autoresearch confidence -m tccw-autoresearch:test-suite-health --headless
-
-# Finalize: clean branches from messy experiment history
-autoresearch finalize -m tccw-autoresearch:test-suite-health --headless
-
-# Daemon — scheduled overnight runs
-autoresearch daemon start
-autoresearch daemon status
-autoresearch daemon stop
-```
-
----
-
-## Intelligence Features
-
-| Feature | Description |
-|---------|-------------|
-| **Ideas backlog** | Failed experiments log *why* they were interesting — future sessions don't repeat mistakes |
-| **Graduated escalation** | 3 failures → REFINE → 5 → PIVOT → 2 PIVOTs → SEARCH → 3 PIVOTs → HALT |
-| **Statistical confidence** | MAD-based scoring after 3+ experiments — ignores benchmark noise |
-| **Dual-gate guard** | Metric gate + regression guard — prevents gaming the metric by breaking something else |
-| **Finalization** | Clean, reviewable branches from messy experimental history |
-| **Agent profiles** | Per-marker Claude Code settings.json + CLAUDE.md generated at runtime |
-| **Permission enforcement** | Mutable/immutable translated to `--allowedTools`/`--disallowedTools` CLI flags |
-| **Telemetry** | Stream-json parsing into TelemetryReport (tokens, cost, tools, errors) |
-
----
-
-## Quick Start — 3 Commands
+**A Claude Code wrapper that makes any codebase measurably better overnight.**
 
 ```bash
 pip install tccw-autoresearch
@@ -147,128 +8,216 @@ cd your-project
 autoresearch init
 ```
 
-That's it. Claude opens, walks you through everything interactively — scans your project, asks what to improve, configures the marker, measures baseline, optionally runs the first experiment.
-
-**Prerequisites:** Python 3.10+ and [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`claude` CLI) installed and authenticated.
-
-### What `autoresearch init` does
-
-1. Scaffolds `.autoresearch/` with the default agent profile
-2. Spawns Claude Code with the `/onboard` skill
-3. Claude scans your project, detects tech stack, suggests metrics
-4. You answer a few questions — Claude writes `config.yaml`
-5. Baseline measured, marker registered, ready to run
-
-Use `--no-claude` for headless/scaffold-only mode (edits config.yaml manually).
+Claude opens. It scans your project. Asks what you want to improve. Configures everything. Runs the first experiment. Done.
 
 ---
 
-## Manual Setup (Alternative to `init`)
+## What Is This?
+
+AutoResearch is an orchestrator that sits on top of [Claude Code](https://docs.anthropic.com/en/docs/claude-code). It gives Claude a metric, a budget, and permission to edit specific files — then measures whether the code got better.
+
+```
+autoresearch (orchestrator)
+  └── claude (the brain)
+        ├── reads your code
+        ├── forms a hypothesis
+        ├── edits files
+        ├── runs your metric
+        └── commits if improved, reverts if not
+```
+
+**You define the metric. Claude does the work. AutoResearch decides what to keep.**
+
+Reduce lint errors. Increase test coverage. Cut build times. Fix code smells. Anything you can measure with a shell command.
+
+---
+
+## Requirements
+
+- **Python 3.10+**
+- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** installed and authenticated (`claude --version`)
+
+That's it. No Docker. No GPU. No ML frameworks. No infrastructure.
+
+---
+
+## How It Works
 
 ### 1. Install
 
 ```bash
 pip install tccw-autoresearch
-
-# Verify
-autoresearch --help
-claude --version
 ```
 
-### 2. Initialize your target repo
+### 2. Initialize (AI-guided)
 
 ```bash
-cd /path/to/your-project
+cd your-project
 autoresearch init
 ```
 
-This creates `.autoresearch/config.yaml` with a starter marker and `.autoresearch/agents/` with the default agent profile.
+This spawns an interactive Claude Code session with the `/onboard` skill:
+- Claude scans your project, detects the tech stack
+- Asks what you want to improve (lint, coverage, build time, custom)
+- Suggests the right metric command for your stack
+- Asks which files are mutable (agent can edit) vs immutable (never touched)
+- Writes `.autoresearch/config.yaml`
+- Measures baseline
+- Optionally runs the first experiment
 
-### 3. Configure your marker
+Use `--no-claude` to skip the wizard and edit config manually.
 
-Edit `.autoresearch/config.yaml` to match your project:
-
-```yaml
-markers:
-  - name: my-improvement          # Pick a short, descriptive name
-    description: "What you want to improve"
-    status: active                 # Set to 'active' to run
-
-    target:
-      mutable:                     # Files the engine CAN edit
-        - src/**/*.py
-      immutable:                   # Test/harness files — NEVER touched
-        - tests/test_main.py
-
-    metric:
-      command: "pytest tests/test_main.py -q --tb=no 2>&1 | tail -1"
-      extract: "grep -oP '\\d+(?= passed)'"
-      direction: higher            # 'higher' = more is better, 'lower' = less is better
-      baseline: 10                 # Current value before any improvement
-
-    loop:
-      model: sonnet                # AI model: sonnet, opus, haiku
-      budget_per_experiment: 10m   # Time limit per experiment
-      max_experiments: 20          # Stop after N experiments
-```
-
-**Key rules for the marker:**
-- `metric.command` must be a **shell command** that produces output (not a bare regex)
-- `metric.extract` must be a **shell command** that filters the output to a single number
-- `target.immutable` files are protected — the agent cannot edit them
-- `target.mutable` files are the only ones the agent is allowed to change
-
-### Run it
+### 3. Run
 
 ```bash
-# Interactive — pick marker from TUI menu
+# Interactive TUI
 autoresearch
 
-# Headless — for AI agents, CI/CD, cron, scripts
-autoresearch run -m my-improvement --headless
+# Headless (CI/CD, cron, scripts)
+autoresearch run -m my-marker --headless
 
 # Check progress
 autoresearch status --headless
-autoresearch results -m my-improvement --headless
+autoresearch results -m my-marker --headless
 ```
 
-### Common marker examples
+### 4. What Happens
 
-**Increase test pass count:**
+```
+LOOP (per experiment):
+  1. Create git worktree (isolated branch)
+  2. Spawn Claude Code agent with your rules
+  3. Agent edits mutable files, guided by issues_command
+  4. Run metric command → extract number
+  5. If improved → keep (git commit)
+  6. If worse → discard (git reset)
+  7. Budget countdown warns agent when time is low
+  8. REPEAT until budget exhausted or HALT
+```
+
+Every kept experiment is a commit. Auto-merge creates PRs with full audit trail.
+
+---
+
+## The Marker File
+
+`.autoresearch/config.yaml` is the only config you need:
+
 ```yaml
-metric:
-  command: "pytest tests/ -q --tb=no 2>&1 | tail -1"
-  extract: "grep -oP '\\d+(?= passed)'"
-  direction: higher
-  baseline: 42
+markers:
+  - name: lint-quality
+    description: "Reduce lint errors"
+    status: active
+    target:
+      mutable: ["src/**/*.py"]        # Agent CAN edit these
+      immutable: ["tests/**/*.py"]    # Agent CANNOT touch these
+    metric:
+      command: "ruff check src/ 2>&1"
+      extract: "grep -oP 'Found \\K\\d+'"
+      direction: lower                # lower = better
+      baseline: 163
+      issues_command: "ruff check src/ --output-format concise | head -30"
+    loop:
+      model: sonnet
+      budget_per_experiment: 20m
+      max_experiments: 10
+    auto_merge:
+      enabled: true
+      target_branch: dev
 ```
 
-**Reduce build time (seconds):**
-```yaml
-metric:
-  command: "bash -c 'TIMEFORMAT=%R; time make build 2>&1'"
-  extract: "tail -1"
-  direction: lower
-  baseline: 120
+### Common Metrics
+
+| Goal | `metric.command` | `metric.extract` | `direction` |
+|------|-----------------|-------------------|-------------|
+| Reduce lint errors | `ruff check src/ 2>&1` | `grep -oP 'Found \K\d+'` | lower |
+| Increase test passes | `pytest tests/ -q --tb=no 2>&1 \| tail -1` | `grep -oP '\d+(?= passed)'` | higher |
+| Increase coverage % | `pytest --cov=src --cov-report=term 2>&1 \| tail -1` | `grep -oP '\d+(?=%)'` | higher |
+| Reduce build time | `bash -c 'TIMEFORMAT=%R; time make build 2>&1'` | `tail -1` | lower |
+| Reduce ESLint errors | `npx eslint src/ 2>&1 \| tail -1` | `grep -oP '\d+(?= problem)'` | lower |
+
+**Any shell command that outputs a number works.**
+
+---
+
+## Claude Code Integration
+
+AutoResearch is built around Claude Code at every level:
+
+| Feature | How Claude Code Is Used |
+|---------|------------------------|
+| **Experiments** | Each experiment spawns `claude` as a subprocess with `--permission-mode`, `--allowedTools`, `--disallowedTools` |
+| **Agent profiles** | `.autoresearch/agents/default/CLAUDE.md` + `settings.json` — shipped with the package |
+| **Budget countdown** | PostToolUse hook injects remaining time via `additionalContext` after every tool call |
+| **`autoresearch init`** | Spawns interactive Claude Code session with `/onboard` skill |
+| **`/autoresearch` skill** | When you open the project in Claude Code: run, status, logs |
+| **`/onboard` skill** | Interactive wizard — scans project, configures marker, measures baseline |
+| **Issues injection** | `issues_command` output injected into agent prompt — exact `file:line:rule` targets |
+| **Telemetry** | Parses Claude Code `stream-json` output for tokens, cost, tools, errors |
+
+### Custom Agent Profiles
+
+The default agent ships with the package. Duplicate to customize:
+
+```bash
+cp -r .autoresearch/agents/default .autoresearch/agents/my-agent
+# Edit my-agent/CLAUDE.md, settings.json, hooks/
+# Update config.yaml: agent.name: my-agent
 ```
 
-**Increase code coverage (%):**
-```yaml
-metric:
-  command: "pytest --cov=src --cov-report=term 2>&1 | tail -1"
-  extract: "grep -oP '\\d+(?=%)'"
-  direction: higher
-  baseline: 65
+Custom agents inherit default hooks (budget countdown) via symlinks.
+
+---
+
+## Intelligence Features
+
+| Feature | Description |
+|---------|-------------|
+| **Issues command** | Agent gets exact `file:line:rule` instead of exploring broadly |
+| **Budget countdown** | 3 tiers: working → wrap up → COMMIT NOW |
+| **Graduated escalation** | 3 fails → refine → 5 → pivot → search → halt |
+| **Statistical confidence** | MAD-based scoring after 3+ experiments |
+| **Dual-gate guard** | Metric + regression guard — prevents gaming |
+| **Ideas backlog** | Failed experiments log why — future sessions don't repeat |
+| **Auto-merge** | Every KEEP → PR → auto-merge to dev → promotion PR to main |
+| **Always-commit** | Engine commits after agent exits regardless of timeout |
+
+---
+
+## CLI Reference
+
+```bash
+autoresearch init          # AI-guided setup (spawns Claude Code)
+autoresearch               # Interactive TUI
+autoresearch run           # Run experiments
+autoresearch status        # Marker dashboard
+autoresearch results       # Experiment history
+autoresearch confidence    # Statistical confidence scores
+autoresearch ideas         # Ideas backlog
+autoresearch add           # Register a marker
+autoresearch detach        # Unregister a marker
+autoresearch skip          # Skip current experiment
+autoresearch pause         # Pause a marker
+autoresearch finalize      # Clean branches from experiment history
+autoresearch merge         # Merge finalized branch
+autoresearch daemon start  # Scheduled overnight runs
 ```
 
-**Reduce lint warnings:**
-```yaml
-metric:
-  command: "ruff check src/ 2>&1 | tail -1"
-  extract: "grep -oP '\\d+(?= error)'"
-  direction: lower
-  baseline: 30
-```
+All commands support `--headless` for JSON output.
+
+---
+
+## Production Results
+
+Deployed on [antoncore](https://github.com/The-Cloud-Clock-Work/antoncore) (3.3k LOC Python monorepo):
+
+| Run | Baseline | Result | Delta | Audit |
+|-----|----------|--------|-------|-------|
+| 1 | 186 errors | 163 | -23 | manual merge |
+| 2 | 163 errors | 133 | -30 | PR #218 (merged) |
+| 3 | 133 errors | 0 | -133 | PR #219 (merged) |
+
+**186 → 0 ruff errors in 3 cycles.** Full GitHub PR audit trail.
 
 ---
 
@@ -276,55 +225,27 @@ metric:
 
 ```
 src/autoresearch/
-  marker.py          # .autoresearch/config.yaml schema + parser (Pydantic)
-  engine.py          # Core experiment loop + AgentRunner ABC
-  worktree.py        # Git worktree isolation per marker
-  metrics.py         # Harness execution + metric extraction + MAD confidence
-  program.py         # Runtime program.md generation (string.Template)
-  agent_profile.py   # settings.json + CLAUDE.md generation + permission flags
-  telemetry.py       # Stream-json telemetry parsing
-  finalize.py        # Cherry-pick + squash winning commits
-  cli.py             # CLI entry point (Typer, 13 commands, dual-mode)
-  cli_utils.py       # Headless helpers (JSON output, prompts)
-  daemon.py          # Daemon service (cron, double-fork, concurrent runs)
-  state.py           # Global state (~/.autoresearch/state.json)
-  config.py          # Config defaults (~/.autoresearch/config.yaml)
-  results.py         # results.tsv read/write
-  ideas.py           # ideas.md backlog
-  utils.py           # Shared utilities (parse_duration)
-  agents/default/    # Default agent profile (CLAUDE.md, settings, rules)
+  cli.py             # 13 commands, interactive + headless
+  engine.py          # Core loop + AgentRunner + auto-publish
+  marker.py          # config.yaml schema (Pydantic)
+  worktree.py        # Git worktree isolation
+  metrics.py         # Metric extraction + MAD confidence
+  program.py         # Runtime prompt generation
+  agent_profile.py   # Claude Code settings + CLAUDE.md generation
+  gates.py           # Security + test + confidence gates
+  telemetry.py       # stream-json parsing
+  daemon.py          # Cron scheduling
+  skills/            # /onboard + /autoresearch Claude Code skills
+  agents/default/    # Shipped agent profile
 ```
 
-**Design principles:**
-- **Agnostic** — no assumptions about what it improves
-- **Self-contained** — repo + marker file = everything needed to run
-- **Dual-mode** — every command works interactively AND headlessly (`--headless`)
-- **Permission-locked** — agent can only edit mutable files, enforced via CLI flags
-- **No ML dependencies** — no torch, no CUDA, no GPU
-
 ---
 
-## Status
+## Links
 
-All blocks complete. 2,557 tests passing. CI gates PRs via `.github/workflows/ci.yml`.
-
-| Block | Description | Status |
-|-------|-------------|--------|
-| Block 1 | Foundation — marker schema, state, results, ideas | Done |
-| Block 2 | Engine — loop, worktree, metrics, escalation, confidence | Done |
-| Block 3 | CLI — interactive TUI + headless JSON, 13 commands | Done |
-| Block 4 | Daemon + packaging — cron, double-fork, pip install | Done |
-| Block 5 | Agent profiles + telemetry — permissions, stream-json | Done |
-
----
-
-## Dependencies
-
-- `pydantic>=2.0` — schema validation
-- `pyyaml>=6.0` — YAML parsing
-- `rich>=13.0` — TUI rendering
-- `typer>=0.12` — CLI framework
-- `croniter>=2.0` — cron schedule evaluation
+- **PyPI:** [tccw-autoresearch](https://pypi.org/project/tccw-autoresearch/)
+- **Docs:** [the-cloud-clock-work.github.io/tccw-autoresearch](https://the-cloud-clock-work.github.io/tccw-autoresearch/)
+- **SonarQube:** 94.8% coverage, 0 bugs, 0 vulnerabilities, 25 code smells
 
 ---
 
