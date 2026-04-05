@@ -1,3 +1,10 @@
+---
+layout: default
+title: Configuration
+parent: Documentation Index
+nav_order: 40
+---
+
 # Configuration
 
 > Global config, `~/.autoresearch/`, env vars.

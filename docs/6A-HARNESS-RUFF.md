@@ -1,3 +1,10 @@
+---
+layout: default
+title: Ruff Harness
+parent: Documentation Index
+nav_order: 60
+---
+
 # 6A — Ruff Harness (Production Reference)
 
 ## Overview

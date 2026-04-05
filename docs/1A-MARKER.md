@@ -1,3 +1,10 @@
+---
+layout: default
+title: Marker Config
+parent: Documentation Index
+nav_order: 10
+---
+
 # Marker
 
 > `.autoresearch.yaml` schema, marker states, and lifecycle.

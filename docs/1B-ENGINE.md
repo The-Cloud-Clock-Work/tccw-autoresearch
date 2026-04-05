@@ -1,3 +1,10 @@
+---
+layout: default
+title: Engine
+parent: Documentation Index
+nav_order: 11
+---
+
 # Engine
 
 > Experiment loop, escalation, commit/discard logic.

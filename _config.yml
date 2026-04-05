@@ -1,0 +1,65 @@
+title: AutoResearch
+description: >-
+  Agnostic autonomous improvement engine.
+  Point it at any codebase — it makes it measurably better overnight.
+url: "https://the-cloud-clock-work.github.io"
+baseurl: "/tccw-autoresearch"
+
+remote_theme: just-the-docs/just-the-docs@v0.10.0
+
+plugins:
+  - jekyll-remote-theme
+  - jekyll-seo-tag
+  - jekyll-sitemap
+
+color_scheme: dark
+search_enabled: true
+
+mermaid:
+  version: "11"
+
+aux_links:
+  GitHub: "https://github.com/The-Cloud-Clock-Work/tccw-autoresearch"
+  PyPI: "https://pypi.org/project/tccw-autoresearch/"
+aux_links_new_tab: true
+
+gh_edit_link: true
+gh_edit_link_text: "Edit this page on GitHub"
+gh_edit_repository: "https://github.com/The-Cloud-Clock-Work/tccw-autoresearch"
+gh_edit_branch: "main"
+gh_edit_view_mode: "edit"
+
+footer_content: >-
+  AutoResearch is open source under the
+  <a href="https://github.com/The-Cloud-Clock-Work/tccw-autoresearch/blob/main/LICENSE">MIT License</a>.
+  Maintained by <a href="https://github.com/The-Cloud-Clock-Work">The Cloud Clock Work</a>.
+
+back_to_top: true
+back_to_top_text: "Back to top"
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: "default"
+
+exclude:
+  - src/
+  - tests/
+  - operator/
+  - "*.py"
+  - "*.pyc"
+  - __pycache__/
+  - "*.egg-info"
+  - dist/
+  - build/
+  - .venv/
+  - venv/
+  - .env
+  - pyproject.toml
+  - CONTRIBUTING.md
+  - CHANGELOG.md
+  - CLAUDE.md
+  - sonar-project.properties
+  - ruff.toml
+  - .autoresearch/

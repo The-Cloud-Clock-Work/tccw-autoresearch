@@ -1,3 +1,10 @@
+---
+layout: default
+title: Daemon
+parent: Documentation Index
+nav_order: 21
+---
+
 # Daemon
 
 > Daemon service, scheduling, cron integration.

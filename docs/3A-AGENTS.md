@@ -1,3 +1,10 @@
+---
+layout: default
+title: Agents
+parent: Documentation Index
+nav_order: 30
+---
+
 # Agents
 
 > Default agent, copilot agent, profile scaffolding.

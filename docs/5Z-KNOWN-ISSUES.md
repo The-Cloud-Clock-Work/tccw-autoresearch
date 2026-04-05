@@ -1,3 +1,10 @@
+---
+layout: default
+title: Known Issues
+parent: Documentation Index
+nav_order: 59
+---
+
 # Known Issues
 
 > Known issues and workarounds.

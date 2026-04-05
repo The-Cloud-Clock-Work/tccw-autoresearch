@@ -1,3 +1,10 @@
+---
+layout: default
+title: Telemetry
+parent: Documentation Index
+nav_order: 41
+---
+
 # Telemetry & Results
 
 > Telemetry, results tracking, `results.tsv`.

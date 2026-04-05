@@ -1,3 +1,10 @@
+---
+layout: default
+title: Testing
+parent: Documentation Index
+nav_order: 50
+---
+
 # Testing
 
 > Test suite, fixtures, running tests.

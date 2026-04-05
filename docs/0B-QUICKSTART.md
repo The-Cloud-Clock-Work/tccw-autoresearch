@@ -1,3 +1,10 @@
+---
+layout: default
+title: Quick Start
+parent: Documentation Index
+nav_order: 3
+---
+
 # Quickstart
 
 > Installation, first marker, first run.

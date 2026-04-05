@@ -1,3 +1,10 @@
+---
+layout: default
+title: Worktree
+parent: Documentation Index
+nav_order: 22
+---
+
 # Worktree
 
 > Git worktree management, branch naming, parallel runs.

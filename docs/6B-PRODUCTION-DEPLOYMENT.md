@@ -1,3 +1,10 @@
+---
+layout: default
+title: Production Deployment
+parent: Documentation Index
+nav_order: 61
+---
+
 # 6B — Production Deployment Guide
 
 ## Overview

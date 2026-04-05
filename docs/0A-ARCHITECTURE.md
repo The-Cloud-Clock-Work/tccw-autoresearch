@@ -1,3 +1,10 @@
+---
+layout: default
+title: Architecture
+parent: Documentation Index
+nav_order: 2
+---
+
 # Architecture
 
 > System architecture, core loop, and design principles for tccw-autoresearch.

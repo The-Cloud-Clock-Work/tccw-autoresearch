@@ -1,3 +1,10 @@
+---
+layout: default
+title: State
+parent: Documentation Index
+nav_order: 13
+---
+
 # State
 
 > `state.json`, local overrides, atomic read-modify-write.

@@ -1,3 +1,10 @@
+---
+layout: default
+title: Ideas & Program
+parent: Documentation Index
+nav_order: 31
+---
+
 # Ideas & Program Synthesis
 
 > Idea generation, program synthesis, and finalize flow.

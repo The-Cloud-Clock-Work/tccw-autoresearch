@@ -1,3 +1,10 @@
+---
+layout: default
+title: Budget Countdown
+parent: Documentation Index
+nav_order: 32
+---
+
 # 3C — Budget Countdown Hook
 
 ## Problem

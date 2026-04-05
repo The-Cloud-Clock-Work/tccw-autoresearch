@@ -1,3 +1,10 @@
+---
+layout: default
+title: Metrics
+parent: Documentation Index
+nav_order: 12
+---
+
 # Metrics
 
 > Metric extraction, guard gates, dual-gate verification.

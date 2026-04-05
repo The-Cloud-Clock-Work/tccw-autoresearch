@@ -1,3 +1,10 @@
+---
+layout: default
+title: CLI
+parent: Documentation Index
+nav_order: 20
+---
+
 # CLI
 
 > CLI commands, interactive + headless modes.

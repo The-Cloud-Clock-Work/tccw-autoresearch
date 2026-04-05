@@ -1,3 +1,10 @@
+---
+layout: default
+title: Gates
+parent: Documentation Index
+nav_order: 14
+---
+
 # 1E — Gate Chain & Auto-Merge
 
 ## Overview
