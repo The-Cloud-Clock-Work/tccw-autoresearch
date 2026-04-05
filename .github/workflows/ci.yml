@@ -16,6 +16,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Configure git identity
+        run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci@test"
+
       - name: Install
         run: pip install -e .[dev]
 

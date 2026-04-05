@@ -11,7 +11,7 @@ jobs:
     with:
       python_version: "3.12"
       install_command: pip install -e ".[dev]"
-      test_command: pytest tests/ -q --cov=src/autoresearch --cov-report=xml --tb=short
+      test_command: git config --global user.name CI && git config --global user.email ci@test && pytest tests/ -q --cov=src/autoresearch --cov-report=xml --tb=short
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
