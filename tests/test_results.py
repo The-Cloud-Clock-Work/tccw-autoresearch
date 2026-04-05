@@ -1,6 +1,5 @@
 """Tests for results management."""
 
-from pathlib import Path
 
 from autoresearch.results import (
     ExperimentResult,

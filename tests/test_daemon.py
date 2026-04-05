@@ -1143,7 +1143,6 @@ class TestDaemonRunnerRunEarlyExit:
         dr = DaemonRunner(config=GlobalConfig())
         tick_calls = []
 
-        original_tick = dr._tick
 
         def tracking_tick():
             tick_calls.append(1)
@@ -1418,7 +1417,6 @@ class TestRunMarkerThreadErrors:
 class TestDaemonRunnerShutdownBehavior:
     def test_shutdown_set_stops_loop(self):
         from autoresearch.config import GlobalConfig
-        from autoresearch.state import AppState
 
         dr = DaemonRunner(config=GlobalConfig())
         tick_calls = []
@@ -1567,7 +1565,7 @@ class TestIsDeadProcessLookupErrorExtra:
 
 class TestStopDaemonStateResetExtra:
     def test_stale_pid_resets_running_to_false(self, tmp_path):
-        from autoresearch.state import AppState, DaemonState, save_state, load_state
+        from autoresearch.state import AppState, DaemonState, save_state
 
         state = AppState(daemon=DaemonState(running=True, pid=99999))
         state_path = tmp_path / "state.json"
@@ -1718,7 +1716,6 @@ class TestDaemonizeGrandchildPath:
 
     def _make_sys_io_mocks(self):
         """Return MagicMock stdin/stdout/stderr with fileno() returning ints."""
-        import sys
         mock_stdin = MagicMock()
         mock_stdin.fileno.return_value = 0
         mock_stdout = MagicMock()
@@ -1878,7 +1875,6 @@ class TestDaemonizeGrandchildPath:
 
     def test_grandchild_signal_handlers_registered(self, tmp_path):
         from autoresearch.daemon import daemonize
-        import signal as sig_mod
 
         fork_calls = []
 
@@ -2677,7 +2673,6 @@ class TestIsDueOvernightSchedule:
         assert is_due(s, "2024-01-01T00:00:00+00:00") is False
 
     def test_cron_with_explicit_expression(self):
-        from datetime import datetime, timezone
         s = self._make_sched("cron", "* * * * *")
         # No last_run — should be due
         assert is_due(s, None) is True
@@ -2977,12 +2972,12 @@ class TestPidManagementVariantsB:
     def test_read_empty_file_returns_none(self, tmp_path):
         p = tmp_path / "test.pid"
         p.write_text("")
-        assert read_pid(p) == None
+        assert read_pid(p) is None
 
     def test_read_whitespace_only_returns_none(self, tmp_path):
         p = tmp_path / "test.pid"
         p.write_text("   \n")
-        assert read_pid(p) == None
+        assert read_pid(p) is None
 
     def test_write_then_overwrite(self, tmp_path):
         p = tmp_path / "test.pid"
@@ -3047,7 +3042,6 @@ class TestDaemonRunnerAttributesB:
         r._reap_threads()  # should not raise
 
     def test_reap_removes_finished_thread(self):
-        import threading
         r = self._make_runner()
         mock_thread = MagicMock()
         mock_thread.is_alive.return_value = False
@@ -3056,7 +3050,6 @@ class TestDaemonRunnerAttributesB:
         assert "repo:marker" not in r._active_runs
 
     def test_reap_keeps_alive_thread(self):
-        import threading
         r = self._make_runner()
         mock_thread = MagicMock()
         mock_thread.is_alive.return_value = True

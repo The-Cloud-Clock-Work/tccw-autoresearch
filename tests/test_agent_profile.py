@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from autoresearch.agent_profile import (
     DEFAULT_AGENT_DIR,
-    AgentPaths,
     ensure_agent_dir,
     generate_claude_md,
     generate_settings,
@@ -16,7 +14,6 @@ from autoresearch.agent_profile import (
 )
 from autoresearch.marker import (
     AgentConfig,
-    Guard,
     LoopConfig,
     Marker,
     Metric,
@@ -217,7 +214,7 @@ class TestInitAutoresearchDir:
     def test_additive_does_not_overwrite_existing(self, tmp_path):
         ar_dir = init_autoresearch_dir(tmp_path)
         claude_md = ar_dir / "agents" / "default" / "CLAUDE.md"
-        original_content = claude_md.read_text()
+        claude_md.read_text()
         claude_md.write_text("custom override")
         # Run again — should NOT overwrite
         init_autoresearch_dir(tmp_path)
@@ -227,7 +224,7 @@ class TestInitAutoresearchDir:
         # Create a custom agent directory before calling init
         custom_agent = tmp_path / ".autoresearch" / "agents" / "custom"
         custom_agent.mkdir(parents=True, exist_ok=True)
-        ar_dir = init_autoresearch_dir(tmp_path)
+        init_autoresearch_dir(tmp_path)
         # Custom agent should get symlinks from default
         symlinks = [f for f in custom_agent.rglob("*") if f.is_symlink()]
         assert len(symlinks) > 0

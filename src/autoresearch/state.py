@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from autoresearch.config import AUTORESEARCH_DIR, ensure_autoresearch_dir
+from autoresearch.config import AUTORESEARCH_DIR
 from autoresearch.marker import Marker, MarkerStatus
 
 

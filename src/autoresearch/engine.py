@@ -17,7 +17,6 @@ from autoresearch.ideas import append_idea, read_ideas
 from autoresearch.marker import Marker, MarkerStatus
 from autoresearch.metrics import (
     compute_confidence,
-    confidence_label,
     is_improved,
     run_guard,
     run_harness,
@@ -30,15 +29,13 @@ from autoresearch.results import (
     get_latest_metric,
     read_results,
 )
-from autoresearch.state import AppState, TrackedMarker, save_state, update_state
+from autoresearch.state import AppState, TrackedMarker, update_state
 from autoresearch.utils import parse_duration
-from autoresearch.finalize import finalize_marker, merge_finalized
-from autoresearch.gates import run_gate_chain
 from autoresearch.worktree import (
     GitError,
     create_worktree,
     git_commit,
-    git_head_short,
+    git_head_short,  # noqa: F401 — used by test mocks via autoresearch.engine.git_head_short
     git_reset_hard,
     remove_worktree,
 )
@@ -154,7 +151,6 @@ class ClaudeCodeRunner(AgentRunner):
     """Agent runner using Claude Code CLI with profile-based permissions."""
 
     def __init__(self, marker: "Marker"):
-        from autoresearch.marker import Marker  # noqa: F811
         self.marker = marker
         self.agent_config = marker.agent
 
@@ -507,8 +503,7 @@ def run_marker(
                     m.last_run = _final_time
                     break
 
-        if state_path:
-            update_state(_apply_run_results, state_path)
+        update_state(_apply_run_results, state_path)
 
         if cleanup_worktree:
             try:
@@ -555,6 +550,10 @@ def _publish_results(
     This runs for EVERY kept experiment — it's the audit trail.
     Every improvement gets a GitHub PR with diff, description, and metric delta.
     """
+    if not shutil.which("gh"):
+        logger.warning("gh CLI not found — skipping PR creation")
+        return
+
     target = marker.auto_merge.target_branch or "dev"
 
     # 1. Push the experiment branch to GitHub

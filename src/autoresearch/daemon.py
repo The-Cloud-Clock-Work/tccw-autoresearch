@@ -17,7 +17,6 @@ from autoresearch.config import AUTORESEARCH_DIR, load_config
 from autoresearch.engine import EngineError, get_agent_runner, run_marker
 from autoresearch.marker import MarkerStatus, find_marker_file, get_marker, load_markers
 from autoresearch.state import (
-    AppState,
     get_effective_status,
     get_tracked,
     load_state,

@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 from typer.testing import CliRunner
 
 from autoresearch.cli import app
@@ -2337,7 +2336,6 @@ class TestEditConfigPrivate:
 
     def test_with_marker_file_runs_editor(self, tmp_path):
         from autoresearch.cli import _edit_config
-        import subprocess
         tracked = _make_tracked(repo_path=str(tmp_path))
         mf = tmp_path / ".autoresearch.yaml"
         mf.write_text("markers: []")
@@ -3199,7 +3197,7 @@ class TestDaemonStatusHeadlessScheduled:
         assert data["data"]["pid"] == 12345
 
     def test_headless_status_scheduled_markers_listed(self, tmp_path):
-        from autoresearch.marker import AgentConfig, Escalation, Guard, LoopConfig, Marker, MarkerFile, MarkerStatus, Metric, MetricDirection, ResultsConfig, Schedule, Target
+        from autoresearch.marker import Escalation, LoopConfig, Marker, MarkerFile, MarkerStatus, Metric, MetricDirection, ResultsConfig, Schedule, Target
         from autoresearch.state import TrackedMarker
 
         tracked = TrackedMarker(

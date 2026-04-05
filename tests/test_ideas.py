@@ -1,6 +1,5 @@
 """Tests for ideas backlog management."""
 
-from pathlib import Path
 
 import pytest
 

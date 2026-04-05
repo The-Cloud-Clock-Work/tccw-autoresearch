@@ -209,7 +209,7 @@ class TestFormatHelpers:
         assert "Near-Misses" in result
 
     def test_generate_no_mutable_files(self):
-        from autoresearch.marker import Target, Metric, MetricDirection
+        from autoresearch.marker import Target
         marker = _make_marker(target=Target(mutable=[], immutable=[]))
         result = generate_program(marker, None, "", "")
         assert "(none)" in result
@@ -220,7 +220,7 @@ class TestFormatHelpers:
         assert "- idea" in result
 
     def test_generate_lower_direction(self):
-        from autoresearch.marker import Metric, MetricDirection
+        from autoresearch.marker import MetricDirection
         marker = _make_marker(
             metric=_make_marker().metric.model_copy(update={"direction": MetricDirection.LOWER})
         )

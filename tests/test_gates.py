@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 
 from autoresearch.gates import (
     GateChainResult,

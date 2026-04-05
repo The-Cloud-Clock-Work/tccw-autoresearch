@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,7 +22,7 @@ class AgentPaths:
     logs_dir: Path
     stream_log_path: Path
     debug_log_path: Path
-    env: dict
+    env: dict = field(default_factory=dict)
 
 
 def resolve_agent_dir(repo_path: Path, agent_name: str) -> Path | None:

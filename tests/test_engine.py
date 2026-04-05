@@ -479,7 +479,7 @@ class TestRunMarker:
             loop=LoopConfig(max_experiments=1, budget_per_experiment="1m"),
         )
         agent = CountingAgent()
-        result = run_marker(
+        run_marker(
             git_repo, marker, _make_state(), _make_tracked(),
             agent, worktree_base=tmp_path / "wt", cleanup_worktree=False,
         )
@@ -1839,15 +1839,18 @@ class TestEscalationStateSearchLevel:
     def test_search_triggers_after_two_pivots_without_progress(self):
         esc = EscalationState(pivot_after=2, search_after_pivots=2, halt_after_pivots=10)
         # pivot 1: 2 discards → pivot
-        esc.on_discard(); esc.on_discard()
+        esc.on_discard()
+        esc.on_discard()
         assert esc.escalation_level == "pivot"
         # pivot 2: 2 more discards → pivots_without_progress hits 2 → search
-        esc.on_discard(); esc.on_discard()
+        esc.on_discard()
+        esc.on_discard()
         assert esc.escalation_level in ("pivot", "search")
 
     def test_search_resets_pivots_without_progress(self):
         esc = EscalationState(pivot_after=2, search_after_pivots=1, halt_after_pivots=10)
-        esc.on_discard(); esc.on_discard()  # pivot 1 → search
+        esc.on_discard()
+        esc.on_discard()  # pivot 1 → search
         assert esc.escalation_level == "search"
         assert esc.pivots_without_progress == 0
 
@@ -1872,7 +1875,8 @@ class TestEscalationStateSearchLevel:
 
     def test_on_keep_resets_pivots_without_progress(self):
         esc = EscalationState(pivot_after=2, search_after_pivots=3, halt_after_pivots=10)
-        esc.on_discard(); esc.on_discard()  # pivot 1
+        esc.on_discard()
+        esc.on_discard()  # pivot 1
         esc.on_keep()
         assert esc.pivots_without_progress == 0
         assert esc.consecutive_failures == 0
@@ -2679,7 +2683,7 @@ class TestHandleGuardFailure:
 
     def test_returns_true_when_guard_passes_after_rework(self, tmp_path):
         from autoresearch.engine import _handle_guard_failure
-        from autoresearch.marker import AgentConfig, Guard
+        from autoresearch.marker import Guard
 
         guard = Guard(command="echo ok", extract=None, threshold=None, rework_attempts=2)
         marker = _make_marker(guard=guard)
@@ -2699,7 +2703,7 @@ class TestHandleGuardFailure:
 
     def test_returns_false_when_rework_agent_fails(self, tmp_path):
         from autoresearch.engine import _handle_guard_failure
-        from autoresearch.marker import AgentConfig, Guard
+        from autoresearch.marker import Guard
 
         guard = Guard(command="echo ok", extract=None, threshold=None, rework_attempts=1)
         marker = _make_marker(guard=guard)
@@ -2714,7 +2718,7 @@ class TestHandleGuardFailure:
 
     def test_returns_false_when_guard_never_passes(self, tmp_path):
         from autoresearch.engine import _handle_guard_failure
-        from autoresearch.marker import AgentConfig, Guard
+        from autoresearch.marker import Guard
 
         guard = Guard(command="echo ok", extract=None, threshold=None, rework_attempts=2)
         marker = _make_marker(guard=guard)
@@ -3323,9 +3327,11 @@ class TestEscalationStateCustomThresholds:
             refine_after=1, pivot_after=2, search_after_pivots=2, halt_after_pivots=5
         )
         # Two pivots needed
-        esc.on_discard(); esc.on_discard()  # pivot 1
+        esc.on_discard()
+        esc.on_discard()  # pivot 1
         assert esc.escalation_level == "pivot"
-        esc.on_discard(); esc.on_discard()  # pivot 2 -> search
+        esc.on_discard()
+        esc.on_discard()  # pivot 2 -> search
         assert esc.escalation_level == "search"
         assert esc.pivots_without_progress == 0
 
@@ -3333,7 +3339,8 @@ class TestEscalationStateCustomThresholds:
         esc = EscalationState(
             refine_after=1, pivot_after=2, search_after_pivots=2, halt_after_pivots=5
         )
-        esc.on_discard(); esc.on_discard()  # pivot 1
+        esc.on_discard()
+        esc.on_discard()  # pivot 1
         esc.on_keep()
         assert esc.pivots_without_progress == 0
         assert esc.consecutive_failures == 0
@@ -3341,7 +3348,8 @@ class TestEscalationStateCustomThresholds:
 
     def test_total_pivots_never_decremented_by_keep(self):
         esc = EscalationState(refine_after=1, pivot_after=2, halt_after_pivots=10)
-        esc.on_discard(); esc.on_discard()  # pivot 1
+        esc.on_discard()
+        esc.on_discard()  # pivot 1
         esc.on_keep()
         assert esc.total_pivots == 1
 
@@ -3827,8 +3835,6 @@ class TestExtractDescriptionNewPatterns:
 
 class TestTargetReachedComprehensive:
     def _marker(self, direction, baseline, target):
-        from autoresearch.marker import MetricDirection
-        from autoresearch.marker import Guard, Schedule, ResultsConfig, AgentConfig
         return Marker(
             name="x", description="",
             target=Target(mutable=["a.py"]),
@@ -4114,7 +4120,6 @@ class TestExtractDescriptionSpecialInputs:
 
 class TestTargetReachedAll:
     def _make_marker(self, target, direction="higher"):
-        from autoresearch.marker import MetricDirection
         m = MagicMock()
         m.metric.target = target
         m.metric.direction.value = direction

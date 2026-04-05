@@ -1,14 +1,11 @@
 """Tests for metrics.py — harness execution and confidence scoring."""
 
 import subprocess
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from autoresearch.metrics import (
-    HarnessResult,
-    GuardResult,
     compute_confidence,
     confidence_label,
     is_improved,
@@ -190,9 +187,6 @@ class TestComputeConfidence:
 
     def test_known_values(self):
         kept = [24.0, 27.0, 31.0]
-        med = 27.0  # median
-        devs = [3.0, 0.0, 4.0]  # |x - med|
-        mad = 3.0  # median of devs
         expected = abs(31.0 - 24.0) / (3.0 * 1.4826)  # ~1.574
 
         result = compute_confidence(kept, 24.0, 31.0)

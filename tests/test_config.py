@@ -1,6 +1,5 @@
 """Tests for global config management."""
 
-from pathlib import Path
 
 from autoresearch.config import (
     DefaultsConfig,

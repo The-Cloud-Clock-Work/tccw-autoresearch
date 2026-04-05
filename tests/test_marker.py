@@ -157,6 +157,5 @@ class TestMarkerDefaults:
         assert result == config_file
 
     def test_marker_file_get_marker_returns_none_for_missing(self):
-        from autoresearch.marker import MarkerFile
         mf = MarkerFile(markers=[])
         assert get_marker(mf, "nonexistent") is None

@@ -1202,7 +1202,6 @@ class TestParseDurationInvalidVariants:
 # NEW BATCH: parse_duration more extensive edge cases
 # ---------------------------------------------------------------------------
 
-from autoresearch.utils import parse_duration
 
 
 class TestParseDurationNewBatch:
@@ -1360,7 +1359,6 @@ class TestParseDurationD:
 # Tests for autoresearch.results
 # ============================================================
 
-import csv
 import tempfile
 import pytest
 from pathlib import Path
@@ -1530,7 +1528,7 @@ class TestAppendResult:
             append_result(repo, "m", ExperimentResult(commit=f"c{i}", metric=1.0, status="keep", description="d"))
         path = repo / RESULTS_DIR / "m" / RESULTS_FILE
         lines = path.read_text().splitlines()
-        header_count = sum(1 for l in lines if "commit" in l and "metric" in l)
+        header_count = sum(1 for line in lines if "commit" in line and "metric" in line)
         assert header_count == 1
 
     def test_appends_multiple(self):
@@ -2120,7 +2118,6 @@ from autoresearch.ideas import (
     append_idea,
     IDEAS_FILE,
     SECTIONS,
-    TEMPLATE,
 )
 
 

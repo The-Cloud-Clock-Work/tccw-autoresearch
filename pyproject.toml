@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-cov"]
+dev = ["pytest>=8.0", "pytest-cov", "ruff>=0.4", "mypy>=1.10"]
 
 [project.scripts]
 autoresearch = "autoresearch.cli:app"

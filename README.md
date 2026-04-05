@@ -289,7 +289,7 @@ src/autoresearch/
 
 ## Status
 
-All blocks complete. 2,541 tests passing.
+All blocks complete. 2,557 tests passing. CI gates PRs via `.github/workflows/ci.yml`.
 
 | Block | Description | Status |
 |-------|-------------|--------|

@@ -325,8 +325,7 @@ def init_cmd(
 ):
     """Initialize .autoresearch/ directory with template config and default agent."""
     _init_ctx(ctx)
-    import shutil
-    from autoresearch.agent_profile import DEFAULT_AGENT_DIR, init_autoresearch_dir
+    from autoresearch.agent_profile import init_autoresearch_dir
     from autoresearch.marker import CONFIG_DIR, CONFIG_FILENAME
 
     repo_path = path.resolve()
@@ -393,6 +392,9 @@ markers:
       permission_mode: bypassPermissions
       allowed_tools: []
       disallowed_tools: []
+    auto_merge:
+      enabled: false
+      target_branch: dev
     schedule:
       type: on-demand
 """
@@ -1123,7 +1125,6 @@ def daemon_start(ctx: typer.Context):
     """Start the daemon in the background."""
     _init_ctx(ctx)
     from autoresearch.daemon import (
-        PID_PATH,
         check_stale_pid,
         daemonize,
         is_pid_alive,

@@ -238,7 +238,7 @@ class TestDeriveMarkerIdExtended:
     def test_id_contains_marker_name(self, tmp_path):
         repo = tmp_path / "r"
         repo.mkdir()
-        state = AppState()
+        AppState()
         marker_id = derive_marker_id(repo, "speed")
         assert "speed" in marker_id
 
