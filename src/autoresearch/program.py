@@ -36,7 +36,7 @@ A marginal improvement that adds complexity? Probably discard.
 An equal result with less code? Definitely keep.
 
 ## Your Task (ONE experiment)
-$issues_section\
+$issues_section
 1. Read the specific files listed in the issues above
 2. Fix as many issues as you can — focus on the highest severity first
 3. git commit with a descriptive message
