@@ -768,7 +768,14 @@ def _write_telemetry_feedback(
             summary = "; ".join(telemetry.errors[:3])
             append_idea(worktree_path, marker_name, "Discarded but Promising", f"**Agent errors:** {summary}")
         if hasattr(telemetry, "permission_denials") and telemetry.permission_denials:
-            summary = "; ".join(telemetry.permission_denials[:3])
+            # permission_denials can be list[dict] (from Claude stream-json) or list[str]
+            denials = []
+            for d in telemetry.permission_denials[:3]:
+                if isinstance(d, dict):
+                    denials.append(f"{d.get('tool_name', 'unknown')}")
+                else:
+                    denials.append(str(d))
+            summary = "; ".join(denials)
             append_idea(worktree_path, marker_name, "Near-Misses", f"**Permission denied:** {summary}")
     except (ValueError, OSError):
         pass
