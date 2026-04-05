@@ -26,12 +26,24 @@
 |------|-------|
 | [3A-AGENTS.md](3A-AGENTS.md) | Default agent, copilot agent, profile scaffolding |
 | [3B-IDEAS-PROGRAM.md](3B-IDEAS-PROGRAM.md) | Idea generation, program synthesis, finalize flow |
+| [3C-BUDGET-COUNTDOWN.md](3C-BUDGET-COUNTDOWN.md) | PostToolUse hook for time awareness, urgency tiers |
+
+## Gates & Auto-Merge
+| File | Topic |
+|------|-------|
+| [1E-GATES.md](1E-GATES.md) | Gate chain, auto-publish PRs, GitHub audit trail |
 
 ## Configuration & Telemetry
 | File | Topic |
 |------|-------|
 | [4A-CONFIGURATION.md](4A-CONFIGURATION.md) | Global config, ~/.autoresearch/, env vars |
 | [4B-TELEMETRY.md](4B-TELEMETRY.md) | Telemetry, results tracking, results.tsv |
+
+## Harnesses (Production-Validated)
+| File | Topic |
+|------|-------|
+| [6A-HARNESS-RUFF.md](6A-HARNESS-RUFF.md) | Ruff harness — zero infra, 2s execution, production results |
+| [6B-PRODUCTION-DEPLOYMENT.md](6B-PRODUCTION-DEPLOYMENT.md) | Step-by-step deployment guide, common issues, scaling |
 
 ## Development
 | File | Topic |
