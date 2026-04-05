@@ -1,11 +1,21 @@
 [project]
 name = "tccw-autoresearch"
 version = "0.1.0"
-description = "Agnostic autonomous improvement engine"
+description = "Agnostic autonomous improvement engine — point it at any codebase, it makes it measurably better overnight"
+authors = [{name = "The Cloud Clock Work"}]
 requires-python = ">=3.10"
 license = {text = "MIT"}
 readme = "README.md"
-keywords = ["autoresearch", "autonomous", "improvement", "testing"]
+keywords = ["autoresearch", "autonomous", "improvement", "testing", "claude-code", "ai-agent"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Quality Assurance",
+]
 dependencies = [
     "pydantic>=2.0",
     "pyyaml>=6.0",
@@ -16,6 +26,11 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-cov", "ruff>=0.4", "mypy>=1.10"]
+
+[project.urls]
+Homepage = "https://github.com/The-Cloud-Clock-Work/tccw-autoresearch"
+Repository = "https://github.com/The-Cloud-Clock-Work/tccw-autoresearch"
+Issues = "https://github.com/The-Cloud-Clock-Work/tccw-autoresearch/issues"
 
 [project.scripts]
 autoresearch = "autoresearch.cli:app"
@@ -29,3 +44,10 @@ packages = ["src/autoresearch"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
