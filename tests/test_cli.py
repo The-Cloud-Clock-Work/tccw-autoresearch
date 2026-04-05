@@ -56,7 +56,7 @@ class TestHeadlessList:
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
         assert data["data"] == []
 
@@ -74,7 +74,7 @@ class TestHeadlessList:
             result = runner.invoke(app, ["--headless", "list"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
         assert len(data["data"]) == 1
         assert data["data"][0]["id"] == "fakerepo:test-marker"
@@ -91,7 +91,7 @@ class TestHeadlessList:
             result = runner.invoke(app, ["--headless", "list"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"][0]["status"] == "unknown"
 
 
@@ -114,7 +114,7 @@ class TestHeadlessStatus:
             result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
         assert data["data"]["id"] == "fakerepo:test-marker"
         assert data["data"]["direction"] == "higher"
@@ -140,7 +140,7 @@ class TestHeadlessResults:
             result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
         assert data["data"] == []
 
@@ -159,7 +159,7 @@ class TestHeadlessResults:
             result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert len(data["data"]) == 1
         assert data["data"][0]["commit"] == "abc1234"
 
@@ -183,7 +183,7 @@ class TestHeadlessIdeas:
             result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
     def test_with_ideas(self, tmp_path):
@@ -198,7 +198,7 @@ class TestHeadlessIdeas:
             result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "caching" in data["data"]["ideas"]
 
 
@@ -215,7 +215,7 @@ class TestHeadlessConfidence:
             result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["confidence_label"] == "--"
 
     def test_with_baseline_and_current(self, tmp_path):
@@ -226,7 +226,7 @@ class TestHeadlessConfidence:
             result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["baseline"] == 10.0
         assert data["data"]["current"] == 25.0
 
@@ -254,7 +254,7 @@ class TestHeadlessAdd:
             result = runner.invoke(app, ["--headless", "add", "--path", str(tmp_path)])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
         assert len(data["data"]["added"]) == 1
 
@@ -279,7 +279,7 @@ class TestHeadlessDetach:
             result = runner.invoke(app, ["--headless", "detach", "-m", "fakerepo:test-marker"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["detached"] == "fakerepo:test-marker"
 
     def test_detach_nonexistent(self):
@@ -302,7 +302,7 @@ class TestHeadlessSkip:
             result = runner.invoke(app, ["--headless", "skip", "-m", "fakerepo:test-marker"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["action"] == "skipped"
 
     def test_unskip_skipped_marker(self):
@@ -314,7 +314,7 @@ class TestHeadlessSkip:
             result = runner.invoke(app, ["--headless", "skip", "-m", "fakerepo:test-marker"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["action"] == "unskipped"
 
     def test_skip_nonexistent(self):
@@ -337,7 +337,7 @@ class TestHeadlessPause:
             result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["action"] == "paused"
 
     def test_resume_paused_marker(self):
@@ -349,7 +349,7 @@ class TestHeadlessPause:
             result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["action"] == "resumed"
 
 
@@ -389,7 +389,7 @@ class TestHeadlessRun:
             result = runner.invoke(app, ["--headless", "run", "-m", "fakerepo:test-marker"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
         assert data["data"][0]["experiments"] == 5
         assert data["data"][0]["kept"] == 3
@@ -423,7 +423,7 @@ class TestDaemonStatus:
         ):
             result = runner.invoke(app, ["--headless", "daemon", "status"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["running"] is False
 
     def test_headless_status_running(self):
@@ -441,7 +441,7 @@ class TestDaemonStatus:
         ):
             result = runner.invoke(app, ["--headless", "daemon", "status"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["running"] is True
 
 
@@ -455,7 +455,7 @@ class TestDaemonStop:
         with patch("autoresearch.daemon.stop_daemon", return_value=True):
             result = runner.invoke(app, ["--headless", "daemon", "stop"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["action"] == "stopped"
 
 
@@ -478,7 +478,7 @@ class TestDaemonStart:
         ):
             result = runner.invoke(app, ["--headless", "daemon", "start"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["pid"] == 12345
 
 
@@ -494,7 +494,7 @@ class TestDaemonLogs:
         with patch("autoresearch.daemon.LOG_PATH", log_file):
             result = runner.invoke(app, ["--headless", "daemon", "logs", "-n", "2"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["lines"] == ["line2", "line3"]
 
 
@@ -513,7 +513,7 @@ class TestInteractiveMode:
             patch("autoresearch.cli.find_marker_file", return_value=None),
         ):
             result = runner.invoke(app, [], input="q\n")
-        assert "No markers tracked" in result.stdout
+        assert "No markers tracked" in result.output
 
     def test_shows_marker_table(self):
         tracked = _make_tracked()
@@ -528,7 +528,7 @@ class TestInteractiveMode:
         ):
             result = runner.invoke(app, [], input="q\n")
 
-        assert "fakerepo" in result.stdout or "test-marker" in result.stdout
+        assert "fakerepo" in result.output or "test-marker" in result.output
 
     def test_select_marker_and_back(self):
         tracked = _make_tracked()
@@ -565,7 +565,7 @@ class TestHeadlessInit:
         ):
             result = runner.invoke(app, ["--headless", "init", "--path", str(tmp_path)])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
         assert data["data"]["config_created"] is True
 
@@ -580,7 +580,7 @@ class TestHeadlessInit:
         ):
             result = runner.invoke(app, ["--headless", "init", "--path", str(tmp_path)])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["config_created"] is False
 
 
@@ -605,7 +605,7 @@ class TestHeadlessFinalize:
         ):
             result = runner.invoke(app, ["--headless", "finalize", "-m", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["branches"] == []
 
     def test_finalize_with_branches(self, tmp_path):
@@ -619,7 +619,7 @@ class TestHeadlessFinalize:
         ):
             result = runner.invoke(app, ["--headless", "finalize", "-m", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert len(data["data"]["branches"]) == 1
         assert data["data"]["branches"][0]["branch"] == "finalize/test-marker-001"
 
@@ -654,7 +654,7 @@ class TestHeadlessMerge:
         ):
             result = runner.invoke(app, ["--headless", "merge", "-m", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["merged"] == "autoresearch/test-marker-mar31"
         assert data["data"]["target"] == "main"
         assert data["data"]["commit"] == "abc1234567890"
@@ -672,7 +672,7 @@ class TestHeadlessMerge:
                 "--branch", "finalize/custom-branch", "--target", "dev",
             ])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["merged"] == "finalize/custom-branch"
         assert data["data"]["target"] == "dev"
 
@@ -714,7 +714,7 @@ class TestHeadlessRunRepoA:
         ):
             result = runner.invoke(app, ["--headless", "run", "--repo", "fakerepo"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"] == []
 
     def test_run_repo_success(self):
@@ -742,7 +742,7 @@ class TestHeadlessRunRepoA:
         ):
             result = runner.invoke(app, ["--headless", "run", "--repo", "fakerepo"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert len(data["data"]) == 1
         assert data["data"][0]["kept"] == 2
 
@@ -1254,7 +1254,7 @@ class TestHeadlessIdeasNotFound:
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "ideas", "-m", "nope:nope"])
         assert result.exit_code == 1
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
 
@@ -1263,7 +1263,7 @@ class TestHeadlessConfidenceNotFound:
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "confidence", "-m", "nope:nope"])
         assert result.exit_code == 1
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
 
@@ -1272,7 +1272,7 @@ class TestHeadlessPauseNotFound:
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "pause", "-m", "nope:nope"])
         assert result.exit_code == 1
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
 
@@ -1284,7 +1284,7 @@ class TestHeadlessAddBadFile:
         ):
             result = runner.invoke(app, ["--headless", "add", "--path", str(tmp_path)])
         assert result.exit_code == 1
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
 
@@ -1352,7 +1352,7 @@ class TestDaemonStartHeadlessError:
         ):
             result = runner.invoke(app, ["--headless", "daemon", "start"])
         assert result.exit_code == 1
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
         assert "Windows" in data.get("message", data.get("error", ""))
 
@@ -1586,7 +1586,7 @@ class TestPrivateShowBranch:
         tracked = _make_tracked(repo_path=str(tmp_path), branch="autoresearch/test")
         mock_result = MagicMock()
         mock_result.returncode = 0
-        mock_result.stdout = "abc1234 Add test\ndef5678 Fix bug\n"
+        mock_result.output = "abc1234 Add test\ndef5678 Fix bug\n"
         with patch("subprocess.run", return_value=mock_result):
             _show_branch(tracked)
 
@@ -1596,7 +1596,7 @@ class TestPrivateShowBranch:
         tracked = _make_tracked(repo_path=str(tmp_path), branch="autoresearch/test")
         mock_result = MagicMock()
         mock_result.returncode = 1
-        mock_result.stdout = ""
+        mock_result.output = ""
         with patch("subprocess.run", return_value=mock_result):
             _show_branch(tracked)
 
@@ -2363,7 +2363,7 @@ class TestShowBranchPrivate:
         tracked = _make_tracked(branch="ar/test")
         mock_result = MagicMock()
         mock_result.returncode = 0
-        mock_result.stdout = "abc1234 improvement\n"
+        mock_result.output = "abc1234 improvement\n"
         with patch("subprocess.run", return_value=mock_result):
             _show_branch(tracked)
 
@@ -2373,7 +2373,7 @@ class TestShowBranchPrivate:
         tracked = _make_tracked(branch="ar/test")
         mock_result = MagicMock()
         mock_result.returncode = 1
-        mock_result.stdout = ""
+        mock_result.output = ""
         with patch("subprocess.run", return_value=mock_result):
             _show_branch(tracked)
 
@@ -2560,7 +2560,7 @@ class TestHeadlessListUnknownMarker:
         ):
             result = runner.invoke(app, ["--headless", "list"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert len(data["data"]) == 1
         assert data["data"][0]["status"] == "unknown"
 
@@ -2572,7 +2572,7 @@ class TestHeadlessListUnknownMarker:
             patch("autoresearch.cli.find_marker_file", return_value=None),
         ):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"][0]["id"] == "myrepo:my-marker"
 
 
@@ -2592,7 +2592,7 @@ class TestHeadlessStatusExtended:
             result = runner.invoke(app, ["--headless", "status", "--marker", "fakerepo:test-marker"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "description" in data["data"]
         assert "direction" in data["data"]
         assert "max_experiments" in data["data"]
@@ -2608,7 +2608,7 @@ class TestHeadlessStatusExtended:
             result = runner.invoke(app, ["--headless", "status", "--marker", "fakerepo:test-marker"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "description" not in data["data"]
         assert data["data"]["status"] == "unknown"
 
@@ -2639,7 +2639,7 @@ class TestHeadlessPauseResumeCycle:
         ):
             result = runner.invoke(app, ["--headless", "pause", "--marker", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        d = json.loads(result.stdout)
+        d = json.loads(result.output)
         assert d["data"]["action"] == "paused"
 
     def test_resume_paused_marker(self):
@@ -2653,7 +2653,7 @@ class TestHeadlessPauseResumeCycle:
         ):
             result = runner.invoke(app, ["--headless", "pause", "--marker", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        d = json.loads(result.stdout)
+        d = json.loads(result.output)
         assert d["data"]["action"] == "resumed"
 
 
@@ -2667,7 +2667,7 @@ class TestHeadlessDetachEdgeCases:
         ):
             result = runner.invoke(app, ["--headless", "detach", "--marker", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["detached"] == "fakerepo:test-marker"
 
     def test_detach_nonexistent_returns_error(self):
@@ -2675,7 +2675,7 @@ class TestHeadlessDetachEdgeCases:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "detach", "--marker", "x:y"])
         assert result.exit_code == 1
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
 
@@ -2691,7 +2691,7 @@ class TestHeadlessConfidenceEdgeCases:
             result = runner.invoke(app, ["--headless", "confidence", "--marker", "fakerepo:test-marker"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["baseline"] == 10.0
         assert data["data"]["current"] == 20.0
 
@@ -2704,7 +2704,7 @@ class TestHeadlessConfidenceEdgeCases:
         ):
             result = runner.invoke(app, ["--headless", "confidence", "--marker", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["confidence_score"] is None
 
 
@@ -2727,7 +2727,7 @@ class TestHeadlessRunRepo:
             result = runner.invoke(app, ["--headless", "run", "--repo", "fakerepo"])
 
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert any("error" in r for r in data["data"])
 
 
@@ -2736,7 +2736,7 @@ class TestNonHeadlessListMessages:
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["list"])
         assert result.exit_code == 0
-        assert "No markers tracked" in result.stdout
+        assert "No markers tracked" in result.output
 
     def test_with_markers_renders_table(self):
         tracked = _make_tracked()
@@ -2750,7 +2750,7 @@ class TestNonHeadlessListMessages:
         ):
             result = runner.invoke(app, ["list"])
         assert result.exit_code == 0
-        assert "test-marker" in result.stdout
+        assert "test-marker" in result.output
 
 
 class TestHeadlessIdeasEdgeCases:
@@ -2759,7 +2759,7 @@ class TestHeadlessIdeasEdgeCases:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "ideas", "--marker", "x:y"])
         assert result.exit_code == 1
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_ideas_with_content_returns_string(self):
@@ -2771,7 +2771,7 @@ class TestHeadlessIdeasEdgeCases:
         ):
             result = runner.invoke(app, ["--headless", "ideas", "--marker", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "ideas" in data["data"]
 
 
@@ -2883,7 +2883,7 @@ class TestHeadlessListMissingMarkerFile:
         ):
             result = runner.invoke(app, ["--headless", "list"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
         entry = data["data"][0]
         assert entry["status"] == "unknown"
@@ -2903,7 +2903,7 @@ class TestHeadlessConfidenceValues:
         ):
             result = runner.invoke(app, ["--headless", "confidence", "--marker", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
     def test_high_current_vs_baseline(self):
@@ -2934,7 +2934,7 @@ class TestHeadlessStatusValues:
         ):
             result = runner.invoke(app, ["--headless", "status", "--marker", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
     def test_skipped_marker_shows_skip_status(self):
@@ -2971,7 +2971,7 @@ class TestHeadlessResultsMultiple:
         ):
             result = runner.invoke(app, ["--headless", "results", "--marker", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert len(data["data"]) == 5
 
 
@@ -3028,7 +3028,7 @@ class TestHeadlessConfidenceMoreEdgeCases:
         ):
             result = runner.invoke(app, ["--headless", "confidence", "--marker", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data.get("status") == "ok"
 
 
@@ -3048,7 +3048,7 @@ class TestHeadlessStatusEdgeCases:
         ):
             result = runner.invoke(app, ["--headless", "status", "--marker", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data.get("status") == "ok"
         assert data["data"]["id"] == "fakerepo:test-marker"
 
@@ -3056,7 +3056,7 @@ class TestHeadlessStatusEdgeCases:
         state = AppState(markers=[])
         with patch("autoresearch.cli._load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "status", "--marker", "unknown:missing"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data.get("status") == "error"
 
 
@@ -3082,7 +3082,7 @@ class TestHeadlessAddBasic:
                 ["--headless", "add", "--path", str(tmp_path)],
             )
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data.get("status") == "ok"
 
 
@@ -3124,7 +3124,7 @@ class TestHeadlessDetachAlreadyGone:
                 app, ["--headless", "detach", "--marker", "fakerepo:nonexistent"]
             )
         # Should report error or exit non-zero
-        assert result.exit_code != 0 or "error" in result.stdout.lower()
+        assert result.exit_code != 0 or "error" in result.output.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -3138,7 +3138,7 @@ class TestHeadlessSkipNotTracked:
             result = runner.invoke(
                 app, ["--headless", "skip", "--marker", "fakerepo:nonexistent"]
             )
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data.get("status") == "error"
 
 
@@ -3153,7 +3153,7 @@ class TestHeadlessPauseNotTracked:
             result = runner.invoke(
                 app, ["--headless", "pause", "--marker", "fakerepo:nonexistent"]
             )
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data.get("status") == "error"
 
 
@@ -3180,7 +3180,7 @@ class TestDaemonStatusHeadlessScheduled:
         ):
             result = runner.invoke(app, ["--headless", "daemon", "status"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["running"] is False
 
     def test_headless_status_running_true_when_pid_alive(self):
@@ -3192,7 +3192,7 @@ class TestDaemonStatusHeadlessScheduled:
         ):
             result = runner.invoke(app, ["--headless", "daemon", "status"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["running"] is True
         assert data["data"]["pid"] == 12345
 
@@ -3231,7 +3231,7 @@ class TestDaemonStatusHeadlessScheduled:
         ):
             result = runner.invoke(app, ["--headless", "daemon", "status"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "scheduled_markers" in data["data"]
 
 
@@ -3244,7 +3244,7 @@ class TestFinalizeCmdHeadless:
         with patch("autoresearch.cli._load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "finalize", "-m", "repo:missing"])
         assert result.exit_code == 1
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_headless_finalize_no_branches_returns_empty_list(self, tmp_path):
@@ -3263,7 +3263,7 @@ class TestFinalizeCmdHeadless:
         ):
             result = runner.invoke(app, ["--headless", "finalize", "-m", "repo:m"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["branches"] == []
 
     def test_headless_finalize_with_branches(self, tmp_path):
@@ -3283,7 +3283,7 @@ class TestFinalizeCmdHeadless:
         ):
             result = runner.invoke(app, ["--headless", "finalize", "-m", "repo:m"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert len(data["data"]["branches"]) == 1
         assert data["data"]["branches"][0]["branch"] == "autoresearch/m-exp1"
 
@@ -3306,7 +3306,7 @@ class TestMergeCmdHeadlessNoBranch:
         with patch("autoresearch.cli._load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "merge", "-m", "repo:m"])
         assert result.exit_code == 1
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_headless_merge_with_explicit_branch(self, tmp_path):
@@ -3327,7 +3327,7 @@ class TestMergeCmdHeadlessNoBranch:
                 "--branch", "custom-branch", "--target", "dev"
             ])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["merged"] == "custom-branch"
         assert data["data"]["target"] == "dev"
 
@@ -3527,7 +3527,7 @@ class TestDaemonLogsHeadlessFollow:
         with patch("autoresearch.daemon.LOG_PATH", log_file):
             result = runner.invoke(app, ["--headless", "daemon", "logs", "--follow"])
         assert result.exit_code == 2
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_headless_log_lines_count_respected(self, tmp_path):
@@ -3536,7 +3536,7 @@ class TestDaemonLogsHeadlessFollow:
         with patch("autoresearch.daemon.LOG_PATH", log_file):
             result = runner.invoke(app, ["--headless", "daemon", "logs", "-n", "3"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert len(data["data"]["lines"]) == 3
         assert data["data"]["lines"][-1] == "line9"
 
@@ -3555,7 +3555,7 @@ class TestInitCmdHeadless:
         ):
             result = runner.invoke(app, ["--headless", "init", "--path", str(tmp_path)])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
         assert "path" in data["data"]
         assert "config" in data["data"]
@@ -3569,7 +3569,7 @@ class TestInitCmdHeadless:
         with patch("autoresearch.agent_profile.init_autoresearch_dir", return_value=ar_dir):
             result = runner.invoke(app, ["--headless", "init", "--path", str(tmp_path)])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["config_created"] is False
 
     def test_non_headless_init_prints_success(self, tmp_path):
@@ -3620,7 +3620,7 @@ class TestResultsCmdHeadlessWithResults:
         ):
             result = runner.invoke(app, ["--headless", "results", "-m", "repo:m"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
         assert len(data["data"]) == 2
 
@@ -3640,7 +3640,7 @@ class TestResultsCmdHeadlessWithResults:
         ):
             result = runner.invoke(app, ["--headless", "results", "-m", "repo:m"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"] == []
 
 
@@ -3665,7 +3665,7 @@ class TestIdeasCmdHeadlessWithContent:
         ):
             result = runner.invoke(app, ["--headless", "ideas", "-m", "repo:m"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "ideas" in data["data"]
         assert "Try X" in data["data"]["ideas"]
 
@@ -3748,12 +3748,12 @@ class TestMainCallbackHeadlessNoSubcommand:
     def test_headless_no_subcommand_exits_2(self):
         result = runner.invoke(app, ["--headless"])
         assert result.exit_code == 2
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_headless_no_subcommand_error_message(self):
         result = runner.invoke(app, ["--headless"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         msg = data.get("message") or data.get("error", "")
         assert "command" in msg.lower()
 
@@ -4039,7 +4039,7 @@ class TestDaemonLogsNoFile:
         with patch("autoresearch.daemon.LOG_PATH", missing):
             result = runner.invoke(app, ["--headless", "daemon", "logs"])
         assert result.exit_code == 1
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
 
@@ -4053,7 +4053,7 @@ class TestRunCmdNoMarkerNoRepo:
         with patch("autoresearch.cli._load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "run"])
         assert result.exit_code == 2
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_non_headless_no_marker_no_repo_exits_2(self):
@@ -4173,7 +4173,7 @@ class TestDaemonStatusUnresolvableMarker:
         ):
             result = runner.invoke(app, ["--headless", "daemon", "status"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"]["scheduled_markers"] == []
 
 
@@ -4592,7 +4592,7 @@ class TestHeadlessListStates:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "list"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert len(data["data"]) == 1
 
     def test_paused_marker_in_list(self, tmp_path):
@@ -4601,7 +4601,7 @@ class TestHeadlessListStates:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "list"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert len(data["data"]) == 1
 
     def test_multiple_markers_all_listed(self):
@@ -4611,7 +4611,7 @@ class TestHeadlessListStates:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "list"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert len(data["data"]) == 2
 
     def test_list_output_has_ok_status(self):
@@ -4619,7 +4619,7 @@ class TestHeadlessListStates:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "list"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
 
@@ -4644,7 +4644,7 @@ class TestHeadlessStatusAdditional:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "status", "-m", "nonexistent:nonexistent"])
         assert result.exit_code == 1
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
 
@@ -4686,7 +4686,7 @@ class TestHeadlessListFields:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "list"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert len(data["data"]) == 1
         assert "id" in data["data"][0]
 
@@ -4697,13 +4697,13 @@ class TestHeadlessListFields:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "list"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert len(data["data"]) == 2
 
     def test_status_ok_in_response(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
-        assert json.loads(result.stdout)["status"] == "ok"
+        assert json.loads(result.output)["status"] == "ok"
 
 
 # ---------------------------------------------------------------------------
@@ -4715,7 +4715,7 @@ class TestHeadlessStatusFields:
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "status", "-m", "missing:marker"])
         assert result.exit_code == 1
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_found_marker_returns_ok(self):
@@ -4724,7 +4724,7 @@ class TestHeadlessStatusFields:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
 
@@ -4781,7 +4781,7 @@ class TestHeadlessResultsAdditional:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
         assert data["data"] == []
 
@@ -4836,7 +4836,7 @@ class TestHeadlessListMoreFields:
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "data" in data
 
     def test_list_with_one_marker(self):
@@ -4845,13 +4845,13 @@ class TestHeadlessListMoreFields:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "list"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert len(data["data"]) == 1
 
     def test_list_status_ok(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data.get("status") == "ok"
 
     def test_list_two_markers(self):
@@ -4861,14 +4861,14 @@ class TestHeadlessListMoreFields:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "list"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert len(data["data"]) == 2
 
     def test_list_json_parseable(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
         assert result.exit_code == 0
-        parsed = json.loads(result.stdout)
+        parsed = json.loads(result.output)
         assert isinstance(parsed, dict)
 
 
@@ -4888,7 +4888,7 @@ class TestHeadlessStatusMore:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
     def test_status_data_has_id(self):
@@ -4897,7 +4897,7 @@ class TestHeadlessStatusMore:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "data" in data
 
 
@@ -4930,7 +4930,7 @@ class TestHeadlessPauseMore:
         ):
             result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert isinstance(data, dict)
 
 
@@ -4948,7 +4948,7 @@ class TestHeadlessPauseActionField:
         ):
             result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert isinstance(data, dict)
 
     def test_pause_status_is_ok(self):
@@ -4960,7 +4960,7 @@ class TestHeadlessPauseActionField:
         ):
             result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
     def test_pause_missing_marker_flag(self):
@@ -4984,7 +4984,7 @@ class TestHeadlessConfidenceMore:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
     def test_confidence_json_parseable(self, tmp_path):
@@ -4993,7 +4993,7 @@ class TestHeadlessConfidenceMore:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert isinstance(data, dict)
 
 
@@ -5013,7 +5013,7 @@ class TestHeadlessResultsMore:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
     def test_results_data_is_list(self, tmp_path):
@@ -5022,7 +5022,7 @@ class TestHeadlessResultsMore:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert isinstance(data["data"], list)
 
 
@@ -5042,7 +5042,7 @@ class TestHeadlessIdeasMore:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
 
@@ -5055,27 +5055,27 @@ class TestHeadlessListExtra:
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert isinstance(data, dict)
 
     def test_list_has_status_key(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "status" in data
 
     def test_list_has_data_key(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "data" in data
 
     def test_list_empty_state_data_is_empty_list(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"] == []
 
     def test_list_with_one_tracked_data_has_one_item(self, tmp_path):
@@ -5084,7 +5084,7 @@ class TestHeadlessListExtra:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "list"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert len(data["data"]) == 1
 
     def test_list_with_two_tracked_data_has_two_items(self, tmp_path):
@@ -5094,7 +5094,7 @@ class TestHeadlessListExtra:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "list"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert len(data["data"]) == 2
 
     def test_list_item_has_id_field(self, tmp_path):
@@ -5102,7 +5102,7 @@ class TestHeadlessListExtra:
         state = AppState(markers=[tracked])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "id" in data["data"][0]
 
     def test_list_item_has_marker_name(self, tmp_path):
@@ -5110,7 +5110,7 @@ class TestHeadlessListExtra:
         state = AppState(markers=[tracked])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "my-marker" in str(data["data"][0])
 
 
@@ -5137,7 +5137,7 @@ class TestHeadlessStatusExtra:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert isinstance(data, dict)
 
     def test_status_has_status_field(self, tmp_path):
@@ -5145,7 +5145,7 @@ class TestHeadlessStatusExtra:
         state = AppState(markers=[tracked])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "status" in data
 
 
@@ -5174,7 +5174,7 @@ class TestHeadlessSkipExtra:
             with patch("autoresearch.cli.save_state"):
                 result = runner.invoke(app, ["--headless", "skip", "-m", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert isinstance(data, dict)
 
 
@@ -5202,7 +5202,7 @@ class TestHeadlessPauseExtra:
         with patch("autoresearch.cli.load_state", return_value=state):
             with patch("autoresearch.cli.save_state"):
                 result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert isinstance(data, dict)
 
 
@@ -5216,7 +5216,7 @@ class TestHeadlessResultsShape:
         state = AppState(markers=[tracked])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "data" in data
 
     def test_results_has_status_key(self, tmp_path):
@@ -5224,7 +5224,7 @@ class TestHeadlessResultsShape:
         state = AppState(markers=[tracked])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "status" in data
 
     def test_results_data_empty_list_no_file(self, tmp_path):
@@ -5232,7 +5232,7 @@ class TestHeadlessResultsShape:
         state = AppState(markers=[tracked])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"] == []
 
 
@@ -5246,7 +5246,7 @@ class TestHeadlessIdeasShape:
         state = AppState(markers=[tracked])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "status" in data
 
     def test_ideas_status_ok(self, tmp_path):
@@ -5254,7 +5254,7 @@ class TestHeadlessIdeasShape:
         state = AppState(markers=[tracked])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
     def test_ideas_is_parseable_json(self, tmp_path):
@@ -5263,7 +5263,7 @@ class TestHeadlessIdeasShape:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
 
 
 # ---------------------------------------------------------------------------
@@ -5276,7 +5276,7 @@ class TestHeadlessConfidenceShape:
         state = AppState(markers=[tracked])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "status" in data
 
     def test_confidence_is_parseable_json(self, tmp_path):
@@ -5285,7 +5285,7 @@ class TestHeadlessConfidenceShape:
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
         assert result.exit_code == 0
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
 
     def test_confidence_not_found_exits_1(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
@@ -5297,19 +5297,19 @@ class TestHeadlessListFieldsB:
     def test_list_status_ok_field(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
     def test_list_data_is_list_type(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert isinstance(data["data"], list)
 
     def test_list_empty_data_is_empty(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"] == []
 
     def test_list_exit_code_zero(self):
@@ -5323,7 +5323,7 @@ class TestHeadlessListFieldsB:
         with patch("autoresearch.cli.load_state", return_value=state), \
              patch("autoresearch.cli.find_marker_file", return_value=None):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert len(data["data"]) == 1
 
     def test_list_item_has_id(self, tmp_path):
@@ -5332,7 +5332,7 @@ class TestHeadlessListFieldsB:
         with patch("autoresearch.cli.load_state", return_value=state), \
              patch("autoresearch.cli.find_marker_file", return_value=None):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "id" in data["data"][0]
 
     def test_list_item_id_value(self, tmp_path):
@@ -5341,7 +5341,7 @@ class TestHeadlessListFieldsB:
         with patch("autoresearch.cli.load_state", return_value=state), \
              patch("autoresearch.cli.find_marker_file", return_value=None):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"][0]["id"] == "myrepo:mymarker"
 
     def test_list_two_markers_two_items(self, tmp_path):
@@ -5351,13 +5351,13 @@ class TestHeadlessListFieldsB:
         with patch("autoresearch.cli.load_state", return_value=state), \
              patch("autoresearch.cli.find_marker_file", return_value=None):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert len(data["data"]) == 2
 
     def test_list_output_parseable_json(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
-        parsed = json.loads(result.stdout)
+        parsed = json.loads(result.output)
         assert parsed is not None
 
 
@@ -5384,7 +5384,7 @@ class TestHeadlessStatusFieldsB:
         with patch("autoresearch.cli.load_state", return_value=state), \
              patch("autoresearch.cli.find_marker_file", return_value=None):
             result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "id" in data.get("data", data)
 
     def test_status_json_parseable(self, tmp_path):
@@ -5392,12 +5392,12 @@ class TestHeadlessStatusFieldsB:
         with patch("autoresearch.cli.load_state", return_value=state), \
              patch("autoresearch.cli.find_marker_file", return_value=None):
             result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
 
     def test_status_not_found_has_status_error(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "status", "-m", "nope:nope"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data.get("status") == "error"
 
 
@@ -5424,12 +5424,12 @@ class TestHeadlessSkipFieldsB:
         with patch("autoresearch.cli.load_state", return_value=state), \
              patch("autoresearch.cli.save_state"):
             result = runner.invoke(app, ["--headless", "skip", "-m", "fakerepo:test-marker"])
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
 
     def test_skip_not_found_status_error(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "skip", "-m", "missing:marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_skip_status_ok(self):
@@ -5437,7 +5437,7 @@ class TestHeadlessSkipFieldsB:
         with patch("autoresearch.cli.load_state", return_value=state), \
              patch("autoresearch.cli.save_state"):
             result = runner.invoke(app, ["--headless", "skip", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
 
@@ -5464,12 +5464,12 @@ class TestHeadlessPauseFieldsB:
         with patch("autoresearch.cli.load_state", return_value=state), \
              patch("autoresearch.cli.save_state"):
             result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
 
     def test_pause_not_found_status_error(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "pause", "-m", "missing:marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_pause_status_ok(self):
@@ -5478,7 +5478,7 @@ class TestHeadlessPauseFieldsB:
         with patch("autoresearch.cli.load_state", return_value=state), \
              patch("autoresearch.cli.save_state"):
             result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
 
@@ -5502,12 +5502,12 @@ class TestHeadlessDetachFieldsB:
         with patch("autoresearch.cli.load_state", return_value=state), \
              patch("autoresearch.cli.save_state"):
             result = runner.invoke(app, ["--headless", "detach", "-m", "fakerepo:test-marker"])
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
 
     def test_detach_not_found_status_error(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "detach", "-m", "nope:nope"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_detach_found_status_ok(self):
@@ -5516,7 +5516,7 @@ class TestHeadlessDetachFieldsB:
         with patch("autoresearch.cli.load_state", return_value=state), \
              patch("autoresearch.cli.save_state"):
             result = runner.invoke(app, ["--headless", "detach", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
 
@@ -5531,7 +5531,7 @@ class TestHeadlessResultsFieldsB:
         state = AppState(markers=[tracked])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["data"] == []
 
     def test_results_status_ok(self, tmp_path):
@@ -5539,7 +5539,7 @@ class TestHeadlessResultsFieldsB:
         state = AppState(markers=[tracked])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
     def test_results_data_is_list(self, tmp_path):
@@ -5547,13 +5547,13 @@ class TestHeadlessResultsFieldsB:
         state = AppState(markers=[tracked])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert isinstance(data["data"], list)
 
     def test_results_not_found_status_error(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "results", "-m", "bad:bad"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
 
@@ -5568,7 +5568,7 @@ class TestHeadlessIdeasFieldsB:
         state = AppState(markers=[tracked])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
     def test_ideas_data_has_ideas_key(self, tmp_path):
@@ -5576,13 +5576,13 @@ class TestHeadlessIdeasFieldsB:
         state = AppState(markers=[tracked])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "ideas" in data.get("data", data)
 
     def test_ideas_not_found_status_error(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "ideas", "-m", "missing:marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_ideas_json_parseable(self, tmp_path):
@@ -5590,7 +5590,7 @@ class TestHeadlessIdeasFieldsB:
         state = AppState(markers=[tracked])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
 
 
 class TestHeadlessConfidenceFieldsB:
@@ -5611,7 +5611,7 @@ class TestHeadlessConfidenceFieldsB:
         state = AppState(markers=[tracked])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
     def test_confidence_json_parseable(self, tmp_path):
@@ -5619,12 +5619,12 @@ class TestHeadlessConfidenceFieldsB:
         state = AppState(markers=[tracked])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
 
     def test_confidence_not_found_status_error(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "confidence", "-m", "bad:bad"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
 
@@ -5636,13 +5636,13 @@ class TestHeadlessListNewBatch:
     def test_list_data_is_list(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert isinstance(data["data"], list)
 
     def test_list_status_ok_always(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
     def test_list_exit_code_zero(self):
@@ -5653,13 +5653,13 @@ class TestHeadlessListNewBatch:
     def test_list_json_has_status_key(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "status" in data
 
     def test_list_json_has_data_key(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "data" in data
 
     def test_list_two_markers(self, tmp_path):
@@ -5671,7 +5671,7 @@ class TestHeadlessListNewBatch:
             patch("autoresearch.cli.find_marker_file", return_value=None),
         ):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert len(data["data"]) == 2
 
     def test_list_marker_has_id_field(self, tmp_path):
@@ -5682,7 +5682,7 @@ class TestHeadlessListNewBatch:
             patch("autoresearch.cli.find_marker_file", return_value=None),
         ):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "id" in data["data"][0]
 
     def test_list_marker_has_status_field(self, tmp_path):
@@ -5693,7 +5693,7 @@ class TestHeadlessListNewBatch:
             patch("autoresearch.cli.find_marker_file", return_value=None),
         ):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "status" in data["data"][0]
 
 
@@ -5710,7 +5710,7 @@ class TestHeadlessStatusNewBatch:
     def test_status_not_found_json_error(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "status", "-m", "bad:bad"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_status_found_exit_0(self, tmp_path):
@@ -5725,14 +5725,14 @@ class TestHeadlessStatusNewBatch:
         state = AppState(markers=[t])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
 
     def test_status_data_key_present(self, tmp_path):
         t = _make_tracked(repo_path=str(tmp_path))
         state = AppState(markers=[t])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "data" in data or "status" in data
 
     def test_status_has_status_key(self, tmp_path):
@@ -5740,7 +5740,7 @@ class TestHeadlessStatusNewBatch:
         state = AppState(markers=[t])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "status" in data
 
 
@@ -5757,7 +5757,7 @@ class TestHeadlessResultsNewBatch:
     def test_results_not_found_json_error(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "results", "-m", "no:no"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_results_found_exit_0(self, tmp_path):
@@ -5772,14 +5772,14 @@ class TestHeadlessResultsNewBatch:
         state = AppState(markers=[t])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
 
     def test_results_status_ok(self, tmp_path):
         t = _make_tracked(repo_path=str(tmp_path))
         state = AppState(markers=[t])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
     def test_results_data_is_list(self, tmp_path):
@@ -5787,7 +5787,7 @@ class TestHeadlessResultsNewBatch:
         state = AppState(markers=[t])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert isinstance(data.get("data", []), list)
 
 
@@ -5804,7 +5804,7 @@ class TestHeadlessIdeasNewBatch:
     def test_ideas_not_found_json_error(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "ideas", "-m", "no:no"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_ideas_found_exit_0(self, tmp_path):
@@ -5819,14 +5819,14 @@ class TestHeadlessIdeasNewBatch:
         state = AppState(markers=[t])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
 
     def test_ideas_status_ok(self, tmp_path):
         t = _make_tracked(repo_path=str(tmp_path))
         state = AppState(markers=[t])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
 
@@ -5843,7 +5843,7 @@ class TestHeadlessConfidenceNewBatch:
     def test_confidence_not_found_json_error_status(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "confidence", "-m", "x:x"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_confidence_found_exit_0(self, tmp_path):
@@ -5858,14 +5858,14 @@ class TestHeadlessConfidenceNewBatch:
         state = AppState(markers=[t])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
 
     def test_confidence_status_ok(self, tmp_path):
         t = _make_tracked(repo_path=str(tmp_path))
         state = AppState(markers=[t])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
 
@@ -5882,7 +5882,7 @@ class TestHeadlessSkipNewBatch:
     def test_skip_not_found_json_error(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "skip", "-m", "nope:nope"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_skip_found_exit_0(self, tmp_path):
@@ -5905,7 +5905,7 @@ class TestHeadlessSkipNewBatch:
             patch("autoresearch.cli.find_marker_file", return_value=None),
         ):
             result = runner.invoke(app, ["--headless", "skip", "-m", "fakerepo:test-marker"])
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
 
     def test_skip_found_status_ok(self, tmp_path):
         t = _make_tracked(repo_path=str(tmp_path))
@@ -5916,7 +5916,7 @@ class TestHeadlessSkipNewBatch:
             patch("autoresearch.cli.find_marker_file", return_value=None),
         ):
             result = runner.invoke(app, ["--headless", "skip", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
 
@@ -5933,7 +5933,7 @@ class TestHeadlessPauseNewBatch:
     def test_pause_not_found_json_error(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "pause", "-m", "nope:nope"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_pause_found_exit_0(self, tmp_path):
@@ -5956,7 +5956,7 @@ class TestHeadlessPauseNewBatch:
             patch("autoresearch.cli.find_marker_file", return_value=None),
         ):
             result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
 
     def test_pause_status_ok(self, tmp_path):
         t = _make_tracked(repo_path=str(tmp_path))
@@ -5967,7 +5967,7 @@ class TestHeadlessPauseNewBatch:
             patch("autoresearch.cli.find_marker_file", return_value=None),
         ):
             result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
 
@@ -5984,7 +5984,7 @@ class TestHeadlessDetachNewBatch:
     def test_detach_not_found_json_error(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "detach", "-m", "nope:nope"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_detach_found_exit_0(self, tmp_path):
@@ -6005,7 +6005,7 @@ class TestHeadlessDetachNewBatch:
             patch("autoresearch.cli.save_state"),
         ):
             result = runner.invoke(app, ["--headless", "detach", "-m", "fakerepo:test-marker"])
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
 
     def test_detach_status_ok(self, tmp_path):
         t = _make_tracked(repo_path=str(tmp_path))
@@ -6015,7 +6015,7 @@ class TestHeadlessDetachNewBatch:
             patch("autoresearch.cli.save_state"),
         ):
             result = runner.invoke(app, ["--headless", "detach", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
 
@@ -6027,13 +6027,13 @@ class TestHeadlessListExtraCoverage:
     def test_empty_data_list_type(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert isinstance(data["data"], list)
 
     def test_status_ok_always_present(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "status" in data
 
     def test_exit_zero(self):
@@ -6044,12 +6044,12 @@ class TestHeadlessListExtraCoverage:
     def test_json_parseable(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
 
     def test_no_markers_empty_data(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "list"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert len(data["data"]) == 0
 
 
@@ -6062,13 +6062,13 @@ class TestHeadlessStatusExtraCoverage:
     def test_missing_marker_error_status(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "status", "-m", "x:y"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_missing_marker_json_parseable(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "status", "-m", "x:y"])
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
 
     def test_found_marker_exit_0(self, tmp_path):
         t = _make_tracked(repo_path=str(tmp_path))
@@ -6082,7 +6082,7 @@ class TestHeadlessStatusExtraCoverage:
         state = AppState(markers=[t])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
     def test_found_marker_has_data(self, tmp_path):
@@ -6090,7 +6090,7 @@ class TestHeadlessStatusExtraCoverage:
         state = AppState(markers=[t])
         with patch("autoresearch.cli.load_state", return_value=state):
             result = runner.invoke(app, ["--headless", "status", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert "data" in data
 
 
@@ -6103,7 +6103,7 @@ class TestHeadlessSkipExtraCoverage:
     def test_skip_not_found_error(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "skip", "-m", "no:no"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_skip_found_exit_0(self, tmp_path):
@@ -6124,7 +6124,7 @@ class TestHeadlessSkipExtraCoverage:
             patch("autoresearch.cli.save_state"),
         ):
             result = runner.invoke(app, ["--headless", "skip", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] in ("ok", "error")
 
 
@@ -6137,7 +6137,7 @@ class TestHeadlessPauseExtraCoverage:
     def test_pause_not_found_error_status(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "pause", "-m", "no:no"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_pause_found_json_parseable(self, tmp_path):
@@ -6148,7 +6148,7 @@ class TestHeadlessPauseExtraCoverage:
             patch("autoresearch.cli.save_state"),
         ):
             result = runner.invoke(app, ["--headless", "pause", "-m", "fakerepo:test-marker"])
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
 
     def test_pause_found_exit_0(self, tmp_path):
         t = _make_tracked(repo_path=str(tmp_path))
@@ -6170,7 +6170,7 @@ class TestHeadlessResultsExtraCoverage:
     def test_not_found_error_status(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "results", "-m", "x:y"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_found_exit_0(self, tmp_path):
@@ -6191,7 +6191,7 @@ class TestHeadlessResultsExtraCoverage:
             patch("autoresearch.results.read_results", return_value=[]),
         ):
             result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
     def test_found_data_is_list(self, tmp_path):
@@ -6202,7 +6202,7 @@ class TestHeadlessResultsExtraCoverage:
             patch("autoresearch.results.read_results", return_value=[]),
         ):
             result = runner.invoke(app, ["--headless", "results", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert isinstance(data.get("data", []), list)
 
 
@@ -6215,7 +6215,7 @@ class TestHeadlessIdeasExtraCoverage:
     def test_not_found_error_status(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "ideas", "-m", "x:y"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_found_exit_0(self, tmp_path):
@@ -6236,7 +6236,7 @@ class TestHeadlessIdeasExtraCoverage:
             patch("autoresearch.ideas.read_ideas", return_value=""),
         ):
             result = runner.invoke(app, ["--headless", "ideas", "-m", "fakerepo:test-marker"])
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
 
 
 class TestHeadlessConfidenceExtraCoverage:
@@ -6248,7 +6248,7 @@ class TestHeadlessConfidenceExtraCoverage:
     def test_not_found_error_status(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "confidence", "-m", "x:y"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_found_exit_0(self, tmp_path):
@@ -6269,7 +6269,7 @@ class TestHeadlessConfidenceExtraCoverage:
             patch("autoresearch.results.read_results", return_value=[]),
         ):
             result = runner.invoke(app, ["--headless", "confidence", "-m", "fakerepo:test-marker"])
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
 
 
 class TestHeadlessDetachExtraCoverage:
@@ -6281,7 +6281,7 @@ class TestHeadlessDetachExtraCoverage:
     def test_not_found_error_status(self):
         with patch("autoresearch.cli.load_state", return_value=AppState()):
             result = runner.invoke(app, ["--headless", "detach", "-m", "x:y"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "error"
 
     def test_found_exit_0(self, tmp_path):
@@ -6302,7 +6302,7 @@ class TestHeadlessDetachExtraCoverage:
             patch("autoresearch.cli.save_state"),
         ):
             result = runner.invoke(app, ["--headless", "detach", "-m", "fakerepo:test-marker"])
-        data = json.loads(result.stdout)
+        data = json.loads(result.output)
         assert data["status"] == "ok"
 
     def test_found_json_parseable(self, tmp_path):
@@ -6313,4 +6313,4 @@ class TestHeadlessDetachExtraCoverage:
             patch("autoresearch.cli.save_state"),
         ):
             result = runner.invoke(app, ["--headless", "detach", "-m", "fakerepo:test-marker"])
-        assert json.loads(result.stdout) is not None
+        assert json.loads(result.output) is not None
