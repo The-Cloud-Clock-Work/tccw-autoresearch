@@ -1104,7 +1104,7 @@ class TestInteractiveInit:
         with (
             patch("autoresearch.agent_profile.init_autoresearch_dir", return_value=tmp_path / ".autoresearch"),
         ):
-            result = runner.invoke(app, ["init", "--path", str(tmp_path)])
+            result = runner.invoke(app, ["init", "--path", str(tmp_path), "--no-claude"])
         assert result.exit_code == 0
         assert "Initialized" in result.output or "Synced" in result.output or "Config" in result.output
 
@@ -3575,7 +3575,7 @@ class TestInitCmdHeadless:
     def test_non_headless_init_prints_success(self, tmp_path):
         ar_dir = tmp_path / ".autoresearch"
         with patch("autoresearch.agent_profile.init_autoresearch_dir", return_value=ar_dir):
-            result = runner.invoke(app, ["init", "--path", str(tmp_path)])
+            result = runner.invoke(app, ["init", "--path", str(tmp_path), "--no-claude"])
         assert result.exit_code == 0
         assert "Initialized" in result.output or "Synced" in result.output
 
@@ -4142,7 +4142,7 @@ class TestInitCmdNonHeadlessAlreadyConfig:
         config_file = ar_dir / "config.yaml"
         config_file.write_text("markers: []")
         with patch("autoresearch.agent_profile.init_autoresearch_dir", return_value=ar_dir):
-            result = runner.invoke(app, ["init", "--path", str(tmp_path)])
+            result = runner.invoke(app, ["init", "--path", str(tmp_path), "--no-claude"])
         assert result.exit_code == 0
         assert "Synced" in result.output
 
@@ -4152,7 +4152,7 @@ class TestInitCmdNonHeadlessAlreadyConfig:
         config_file = ar_dir / "config.yaml"
         config_file.write_text("markers: []")
         with patch("autoresearch.agent_profile.init_autoresearch_dir", return_value=ar_dir):
-            result = runner.invoke(app, ["init", "--path", str(tmp_path)])
+            result = runner.invoke(app, ["init", "--path", str(tmp_path), "--no-claude"])
         assert "already existed" in result.output
 
 

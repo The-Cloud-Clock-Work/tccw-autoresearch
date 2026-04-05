@@ -139,21 +139,38 @@ autoresearch daemon stop
 
 ---
 
-## Quick Start — Set Up Any Repo in 3 Steps
-
-### 1. Install the CLI
-
-**Prerequisites:**
-- Python 3.10+
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`claude` CLI) installed and authenticated — this is what actually edits code
+## Quick Start — 3 Commands
 
 ```bash
-# Install autoresearch
-git clone git@github.com:The-Cloud-Clock-Work/tccw-autoresearch.git
-cd tccw-autoresearch
-pip install -e .
+pip install tccw-autoresearch
+cd your-project
+autoresearch init
+```
 
-# Verify both are available
+That's it. Claude opens, walks you through everything interactively — scans your project, asks what to improve, configures the marker, measures baseline, optionally runs the first experiment.
+
+**Prerequisites:** Python 3.10+ and [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`claude` CLI) installed and authenticated.
+
+### What `autoresearch init` does
+
+1. Scaffolds `.autoresearch/` with the default agent profile
+2. Spawns Claude Code with the `/onboard` skill
+3. Claude scans your project, detects tech stack, suggests metrics
+4. You answer a few questions — Claude writes `config.yaml`
+5. Baseline measured, marker registered, ready to run
+
+Use `--no-claude` for headless/scaffold-only mode (edits config.yaml manually).
+
+---
+
+## Manual Setup (Alternative to `init`)
+
+### 1. Install
+
+```bash
+pip install tccw-autoresearch
+
+# Verify
 autoresearch --help
 claude --version
 ```

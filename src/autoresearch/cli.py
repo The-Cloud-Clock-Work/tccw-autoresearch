@@ -322,9 +322,19 @@ def confidence_cmd(
 def init_cmd(
     ctx: typer.Context,
     path: Path = typer.Option(".", "--path", help="Repo path (default: current directory)"),
+    no_claude: bool = typer.Option(False, "--no-claude", help="Skip Claude onboard wizard, scaffold only"),
+    model: str = typer.Option("opus", "--model", help="Claude model for onboard wizard"),
 ):
-    """Initialize .autoresearch/ directory with template config and default agent."""
+    """Initialize .autoresearch/ in a repo and launch the Claude onboard wizard.
+
+    Scaffolds the default agent profile + config template, then spawns an
+    interactive Claude Code session with the /onboard skill to walk you through
+    marker configuration. Use --no-claude for headless/scaffolding-only mode.
+    """
     _init_ctx(ctx)
+    import shutil
+    import subprocess
+
     from autoresearch.agent_profile import init_autoresearch_dir
     from autoresearch.marker import CONFIG_DIR, CONFIG_FILENAME
 
@@ -342,23 +352,54 @@ def init_cmd(
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(CONFIG_TEMPLATE)
 
-    if is_headless(ctx):
-        headless_output(ctx, ok_json({
-            "path": str(ar_dir),
-            "config": str(config_path),
-            "agents_dir": str(ar_dir / "agents"),
-            "config_created": not already_has_config,
-        }))
-    else:
-        if already_has_config:
-            console.print(f"[green]Synced agent files in {ar_dir}[/green]")
+    if is_headless(ctx) or no_claude:
+        # Headless / no-claude: scaffold only, print instructions
+        if is_headless(ctx):
+            headless_output(ctx, ok_json({
+                "path": str(ar_dir),
+                "config": str(config_path),
+                "agents_dir": str(ar_dir / "agents"),
+                "config_created": not already_has_config,
+            }))
         else:
-            console.print(f"[green]Initialized .autoresearch/ in {repo_path}[/green]")
-        console.print(f"  Config: {config_path}" + (" [dim](already existed)[/dim]" if already_has_config else ""))
-        console.print(f"  Agent:  {ar_dir / 'agents' / 'default'}/")
+            if already_has_config:
+                console.print(f"[green]Synced agent files in {ar_dir}[/green]")
+            else:
+                console.print(f"[green]Initialized .autoresearch/ in {repo_path}[/green]")
+            console.print(f"  Config: {config_path}" + (" [dim](already existed)[/dim]" if already_has_config else ""))
+            console.print(f"  Agent:  {ar_dir / 'agents' / 'default'}/")
+            console.print()
+            console.print("[dim]Edit config.yaml to configure your markers.[/dim]")
+            console.print("[dim]Duplicate agents/default/ to create custom agents.[/dim]")
+        return
+
+    # Interactive: spawn Claude with /onboard skill
+    if not shutil.which("claude"):
+        console.print("[yellow]claude CLI not found on PATH — falling back to scaffold-only mode.[/yellow]")
+        console.print(f"[green]Initialized .autoresearch/ in {repo_path}[/green]")
+        console.print(f"  Config: {config_path}")
         console.print()
-        console.print("[dim]Edit config.yaml to configure your markers.[/dim]")
-        console.print("[dim]Duplicate agents/default/ to create custom agents.[/dim]")
+        console.print("[dim]Install Claude Code (https://docs.anthropic.com/en/docs/claude-code) for the interactive onboard wizard.[/dim]")
+        return
+
+    # claude_home has .claude/skills/ with onboard + autoresearch skills
+    claude_home = Path(__file__).parent / "claude_home"
+    if not (claude_home / ".claude" / "skills").exists():
+        console.print("[yellow]Skills directory not found in package — falling back to scaffold-only mode.[/yellow]")
+        return
+
+    console.print(f"[green]Scaffolded .autoresearch/ in {repo_path}[/green]")
+    console.print()
+    console.print("[bold]Launching Claude onboard wizard...[/bold]")
+    console.print()
+
+    cmd = [
+        "claude",
+        "--model", model,
+        "--add-dir", str(repo_path),
+        f"/onboard {repo_path}",
+    ]
+    subprocess.run(cmd, cwd=str(claude_home))
 
 
 CONFIG_TEMPLATE = """\
