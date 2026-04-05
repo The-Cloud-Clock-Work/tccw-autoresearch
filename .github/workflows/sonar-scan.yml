@@ -1,0 +1,19 @@
+name: SonarQube Scan
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sonar:
+    uses: The-Cloud-Clock-Work/.github/.github/workflows/sonar-reusable.yml@main
+    with:
+      python_version: "3.12"
+      install_command: pip install -e ".[dev]"
+      test_command: pytest tests/ -q --cov=src/autoresearch --cov-report=xml --tb=short
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
