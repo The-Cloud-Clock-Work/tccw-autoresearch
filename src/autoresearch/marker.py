@@ -37,6 +37,7 @@ class Metric(BaseModel):
     direction: MetricDirection
     baseline: float
     target: float | None = None
+    issues_command: str | None = None
 
 
 class Guard(BaseModel):

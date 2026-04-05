@@ -337,7 +337,8 @@ def run_marker(
             results_summary = _format_results_for_program(results)
             ideas_content = read_ideas(wt_info.path, marker.name)
             program = generate_program(
-                marker, current_best, results_summary, ideas_content, esc.escalation_level
+                marker, current_best, results_summary, ideas_content, esc.escalation_level,
+                repo_path=repo_path,
             )
 
             # Invoke agent
@@ -345,10 +346,9 @@ def run_marker(
                 wt_info.path, program, marker.loop.budget_per_experiment
             )
 
-            # Commit changes
-            commit_hash = ""
-            if agent_result.success:
-                commit_hash = git_commit(wt_info.path, agent_result.description or "experiment")
+            # Commit changes — always attempt, even on timeout/failure.
+            # The agent may have edited files without committing.
+            commit_hash = git_commit(wt_info.path, agent_result.description or "experiment")
 
             if not commit_hash:
                 # No changes made or agent failed

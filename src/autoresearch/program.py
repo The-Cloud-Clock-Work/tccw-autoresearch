@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import logging
+import subprocess
+from pathlib import Path
 from string import Template
 
 from autoresearch.marker import Marker
+
+logger = logging.getLogger(__name__)
 
 
 PROGRAM_TEMPLATE = Template("""\
@@ -31,17 +36,17 @@ A marginal improvement that adds complexity? Probably discard.
 An equal result with less code? Definitely keep.
 
 ## Your Task (ONE experiment)
-1. Read current code and results history below
-2. Propose a hypothesis (what to change and why)
-3. Edit target files to implement your hypothesis
-4. git commit with a descriptive message
-5. EXIT — you are done. The engine will run the metric harness and decide keep/discard.
+$issues_section\
+1. Read the specific files listed in the issues above
+2. Fix as many issues as you can — focus on the highest severity first
+3. git commit with a descriptive message
+4. EXIT — you are done. The engine will run the metric harness and decide keep/discard.
 
-IMPORTANT: Do NOT run the metric harness yourself. Do NOT loop. Make your changes, commit, and exit.
-The engine calls you once per experiment. Make it count.
+IMPORTANT: Do NOT run the metric harness yourself. Do NOT loop. Do NOT explore broadly.
+Fix the SPECIFIC issues listed above, commit, and exit. Be surgical.
 
 ## Time Budget
-You have $budget to make your changes. Be focused and efficient.
+You have $budget to make your changes. Go straight to the files, fix the issues, commit.
 
 $escalation_section\
 $results_section\
@@ -55,6 +60,7 @@ def generate_program(
     results_summary: str,
     ideas_content: str,
     escalation_level: str = "normal",
+    repo_path: Path | None = None,
 ) -> str:
     """Generate the program.md instruction document from a marker.
 
@@ -64,6 +70,7 @@ def generate_program(
         results_summary: Formatted results history (truncated).
         ideas_content: Content from ideas.md.
         escalation_level: Current escalation level (normal/refine/pivot/search/halt).
+        repo_path: Repository path for running issues_command.
 
     Returns:
         Complete program.md content as a string.
@@ -75,6 +82,8 @@ def generate_program(
 
     target_line = f"Target: {marker.metric.target}" if marker.metric.target else ""
 
+    issues_section = _fetch_issues(marker, repo_path)
+
     return PROGRAM_TEMPLATE.substitute(
         mutable=_format_file_list(marker.target.mutable),
         immutable=_format_file_list(marker.target.immutable),
@@ -84,10 +93,38 @@ def generate_program(
         baseline_line=baseline_line,
         target_line=target_line,
         budget=marker.loop.budget_per_experiment,
+        issues_section=issues_section,
         escalation_section=_escalation_instructions(escalation_level),
         results_section=_format_results_section(results_summary),
         ideas_section=_format_ideas_section(ideas_content),
     )
+
+
+def _fetch_issues(marker: Marker, repo_path: Path | None) -> str:
+    """Fetch specific issues from the metric system to guide the agent."""
+    cmd = marker.metric.issues_command
+    if not cmd:
+        return "Find and fix issues that will improve the metric.\n\n"
+
+    try:
+        result = subprocess.run(
+            ["bash", "-c", cmd],
+            cwd=repo_path or Path("."),
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            issues = result.stdout.strip()
+            logger.info(f"Fetched issues for agent: {issues.count(chr(10)) + 1} lines")
+            return f"## Specific Issues to Fix\nThese are the EXACT issues from the metric system. Fix these — do not explore broadly.\n\n```\n{issues}\n```\n\n"
+        logger.warning(f"Issues command returned no output (rc={result.returncode})")
+    except subprocess.TimeoutExpired:
+        logger.warning("Issues command timed out (60s)")
+    except Exception as e:
+        logger.warning(f"Issues command failed: {e}")
+
+    return "Find and fix issues that will improve the metric.\n\n"
 
 
 def _format_file_list(files: list[str]) -> str:
