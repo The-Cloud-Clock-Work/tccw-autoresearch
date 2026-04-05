@@ -1,4 +1,4 @@
-# tccw-autoresearch
+# The Cloud Clock Work - Autoresearch
 
 **A Claude Code wrapper that makes any codebase measurably better overnight.**
 
