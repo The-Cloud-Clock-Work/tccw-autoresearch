@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -222,6 +223,9 @@ class ClaudeCodeRunner(AgentRunner):
                 if line and not line.startswith("#") and "=" in line:
                     key, _, value = line.partition("=")
                     env[key.strip()] = value.strip()
+
+        # Set budget deadline for the countdown hook
+        env["AUTORESEARCH_BUDGET_END"] = str(int(time.time()) + timeout_seconds)
 
         logger.info(f"Agent cmd: {' '.join(cmd[:6])}...")
         logger.debug(f"Agent cwd: {paths.agent_dir}")

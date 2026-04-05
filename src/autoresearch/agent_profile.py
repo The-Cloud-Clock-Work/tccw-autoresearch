@@ -296,21 +296,45 @@ def ensure_agent_dir(
     _, _, agent_env = _load_agent_base(worktree_path, marker.agent.name)
 
     # Write settings.local.json so Claude Code reads the env block (OTEL,
-    # telemetry). Claude walks UP from CWD looking for .claude/ — the agent
-    # runs from .autoresearch/agents/<name>/ which has its own .claude/ dir.
-    # So we write settings.local.json THERE (agent CWD) AND at worktree root.
+    # telemetry) and hooks (budget countdown). Claude walks UP from CWD
+    # looking for .claude/ — the agent runs from .autoresearch/agents/<name>/
+    # which has its own .claude/ dir. Write THERE (agent CWD) AND at worktree root.
+    local_settings: dict = {}
     if agent_env:
+        local_settings["env"] = agent_env
+
+    # Budget countdown hook — PostToolUse injects remaining time as additionalContext
+    hook_script = agent_dir / "hooks" / "budget-countdown.sh"
+    if hook_script.is_file() or (agent_dir / "hooks").is_dir():
+        # Resolve through symlinks to get the real path
+        resolved = hook_script.resolve() if hook_script.exists() else None
+        if resolved and resolved.is_file():
+            local_settings["hooks"] = {
+                "PostToolUse": [
+                    {
+                        "hooks": [
+                            {
+                                "type": "command",
+                                "command": f"bash {resolved}",
+                                "timeout": 3,
+                            }
+                        ]
+                    }
+                ]
+            }
+
+    if local_settings:
         for claude_dir in [
             agent_dir / ".claude",                  # agent CWD (found first)
             worktree_path / ".claude",              # worktree root (fallback)
         ]:
             local_settings_path = claude_dir / "settings.local.json"
             claude_dir.mkdir(parents=True, exist_ok=True)
-            local_settings = {}
+            existing = {}
             if local_settings_path.is_file():
-                local_settings = json.loads(local_settings_path.read_text())
-            local_settings["env"] = agent_env
-            local_settings_path.write_text(json.dumps(local_settings, indent=2))
+                existing = json.loads(local_settings_path.read_text())
+            existing.update(local_settings)
+            local_settings_path.write_text(json.dumps(existing, indent=2))
 
     ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
 
