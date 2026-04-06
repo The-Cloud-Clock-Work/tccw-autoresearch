@@ -2554,12 +2554,12 @@ class TestIsDueBoundaries:
         assert is_due(self._make_sched("overnight"), old, now) is True
 
     def test_cron_every_hour_old_run_due(self):
-        now = datetime.now(timezone.utc)
+        now = datetime(2026, 6, 15, 14, 30, 0, tzinfo=timezone.utc)
         old = (now - timedelta(hours=2)).isoformat()
         assert is_due(self._make_sched("cron", "0 * * * *"), old, now) is True
 
     def test_cron_every_hour_recent_run_not_due(self):
-        now = datetime.now(timezone.utc)
+        now = datetime(2026, 6, 15, 14, 30, 0, tzinfo=timezone.utc)
         recent = (now - timedelta(minutes=5)).isoformat()
         result = is_due(self._make_sched("cron", "0 * * * *"), recent, now)
         assert result is False
