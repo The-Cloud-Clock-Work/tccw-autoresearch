@@ -1,0 +1,91 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "tests/integration/**"
+      - "Dockerfile.ci"
+  workflow_dispatch:
+    inputs:
+      run_e2e:
+        description: "Run real Claude e2e test (~$0.10)"
+        type: boolean
+        default: false
+
+jobs:
+  integration-lite:
+    name: "Integration (no Docker)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Git identity
+        run: |
+          git config --global user.name CI
+          git config --global user.email ci@test
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Run integration tests 1-4
+        run: pytest tests/integration/ -k "not Stub and not E2E" -q --tb=short
+
+  integration-stub:
+    name: "Integration (stub Claude)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Git identity
+        run: |
+          git config --global user.name CI
+          git config --global user.email ci@test
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Run engine stub tests
+        run: pytest tests/integration/test_engine_stub.py -q --tb=short
+
+  integration-e2e:
+    name: "Integration (real Claude)"
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_e2e == true }}
+    runs-on: ubuntu-latest
+    env:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Claude Code
+        run: curl -fsSL https://claude.ai/install.sh | sh
+
+      - name: Git identity
+        run: |
+          git config --global user.name CI
+          git config --global user.email ci@test
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Run e2e test
+        run: pytest tests/integration/test_e2e_real_claude.py -q --tb=short --timeout=180
