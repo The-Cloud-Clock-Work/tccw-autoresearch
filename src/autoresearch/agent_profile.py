@@ -226,6 +226,18 @@ def init_autoresearch_dir(repo_path: Path) -> Path:
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src_file, dst)
 
+    # Write .gitignore for runtime artifacts (logs, telemetry, state)
+    gitignore_path = ar_dir / ".gitignore"
+    if not gitignore_path.exists():
+        gitignore_path.write_text(
+            "# Autoresearch runtime artifacts — do not commit\n"
+            "state.json\n"
+            "*/logs/\n"
+            "*/run.log\n"
+            "*/ideas.md\n"
+            "*/results.tsv\n"
+        )
+
     # Symlink default agent files into all custom agents
     agents_dir = ar_dir / "agents"
     if agents_dir.is_dir():
