@@ -5,6 +5,7 @@
 [![Bugs](https://img.shields.io/endpoint?url=https://the-cloud-clock-work.github.io/tccw-autoresearch/badges/bugs.json)](https://the-cloud-clock-work.github.io/tccw-autoresearch/)
 [![Vulnerabilities](https://img.shields.io/endpoint?url=https://the-cloud-clock-work.github.io/tccw-autoresearch/badges/vulnerabilities.json)](https://the-cloud-clock-work.github.io/tccw-autoresearch/)
 [![Code Smells](https://img.shields.io/endpoint?url=https://the-cloud-clock-work.github.io/tccw-autoresearch/badges/code-smells.json)](https://the-cloud-clock-work.github.io/tccw-autoresearch/)
+
 **A Claude Code wrapper that makes any codebase measurably better overnight.**
 
 ```bash
