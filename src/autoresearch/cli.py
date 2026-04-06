@@ -917,6 +917,84 @@ def merge_cmd(
         raise typer.Exit(code=1)
 
 
+@app.command("clean")
+def clean_cmd(
+    ctx: typer.Context,
+    marker_name: Optional[str] = typer.Option(None, "--marker", "-m", help="Marker name to clean branches for"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be deleted without deleting"),
+    remote: bool = typer.Option(False, "--remote", help="Also delete remote branches"),
+):
+    """Delete stale autoresearch experiment branches."""
+    _init_ctx(ctx)
+    import subprocess
+
+    repo_path = Path.cwd()
+    prefix = "autoresearch/"
+    if marker_name:
+        prefix = f"autoresearch/{marker_name}-"
+
+    # Find all local autoresearch branches
+    result = subprocess.run(
+        ["git", "branch", "--list", f"{prefix}*"],
+        cwd=repo_path, capture_output=True, text=True,
+    )
+    branches = [b.strip().lstrip("* ") for b in result.stdout.splitlines() if b.strip()]
+
+    if not branches:
+        msg = "No autoresearch branches found."
+        if is_headless(ctx):
+            headless_output(ctx, ok_json({"deleted": [], "message": msg}))
+        else:
+            console.print(f"[dim]{msg}[/dim]")
+        return
+
+    # Sort by suffix number, keep the latest
+    def _sort_key(b: str) -> int:
+        parts = b.rsplit("-", 1)
+        if len(parts) == 2 and parts[1].isdigit():
+            return int(parts[1])
+        return 0
+
+    branches.sort(key=_sort_key)
+    latest = branches[-1]
+    to_delete = branches[:-1]
+
+    if not to_delete:
+        msg = f"Only 1 branch ({latest}) — nothing to clean."
+        if is_headless(ctx):
+            headless_output(ctx, ok_json({"kept": latest, "deleted": []}))
+        else:
+            console.print(f"[dim]{msg}[/dim]")
+        return
+
+    if dry_run:
+        if is_headless(ctx):
+            headless_output(ctx, ok_json({"kept": latest, "would_delete": to_delete}))
+        else:
+            console.print(f"[green]Keep:[/green] {latest}")
+            for b in to_delete:
+                console.print(f"[red]Delete:[/red] {b}")
+        return
+
+    deleted = []
+    for b in to_delete:
+        subprocess.run(["git", "branch", "-D", b], cwd=repo_path, capture_output=True, text=True)
+        deleted.append(b)
+        if remote:
+            subprocess.run(
+                ["git", "push", "origin", "--delete", b],
+                cwd=repo_path, capture_output=True, text=True, timeout=15,
+            )
+
+    if is_headless(ctx):
+        headless_output(ctx, ok_json({"kept": latest, "deleted": deleted, "remote": remote}))
+    else:
+        console.print(f"[green]Kept:[/green] {latest}")
+        console.print(f"[red]Deleted {len(deleted)} branch(es)[/red]")
+        if remote:
+            console.print("[dim]Remote branches also deleted.[/dim]")
+
+
 # ---------------------------------------------------------------------------
 # Interactive TUI
 # ---------------------------------------------------------------------------
