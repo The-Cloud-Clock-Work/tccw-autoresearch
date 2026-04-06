@@ -621,8 +621,8 @@ def _build_progress_panel(marker_id: str, marker, history: list):
 
     baseline = marker.metric.baseline or 0
     direction = marker.metric.direction.value
-    budget = marker.loop.budget_per_experiment
-    max_exp = marker.loop.max_experiments
+    budget = marker.agent.budget_per_experiment
+    max_exp = marker.agent.max_experiments
 
     # Current stats from latest history entry
     last = history[-1] if history else None
