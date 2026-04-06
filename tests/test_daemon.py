@@ -2443,8 +2443,6 @@ class TestCheckStalePidExtended:
         # After clearing, file should not exist or read_pid returns None
         if pid_path.exists():
             assert read_pid(pid_path) is None
-        else:
-            assert True
 
 
 # ---------------------------------------------------------------------------

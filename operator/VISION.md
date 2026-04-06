@@ -39,7 +39,7 @@ This works on anything with a measurable outcome: test pass rates, build times, 
 
 The central concept is the **marker**. A marker is a declaration: "this thing is under autonomous improvement."
 
-A `.autoresearch.yaml` file in any repository declares one or more markers. Each marker defines what to improve, how to measure it, and what constraints apply. When the engine finds a marker, it knows exactly what to do.
+A `.autoresearch/config.yaml` file in any repository declares one or more markers. Each marker defines what to improve, how to measure it, and what constraints apply. When the engine finds a marker, it knows exactly what to do.
 
 You look at your repos and instantly see what's being improved. You add a marker, the engine picks it up. You set a marker to `skip`, the engine ignores it. You set it to `active`, it runs overnight. The marker is the interface between human intent and autonomous execution.
 
@@ -49,7 +49,7 @@ Multiple markers per repo. Each independent. Each on its own git worktree. Each 
 
 ## The Repo Is the Engine
 
-The most important architectural decision: **the repo is self-contained**. The `.autoresearch.yaml` marker file carries everything needed to run the improvement loop. The CLI reads it from the repo, generates agent instructions at runtime, executes the loop right there in the worktree. No external payloads, no config transfer, no special integrations.
+The most important architectural decision: **the repo is self-contained**. The `.autoresearch/config.yaml` marker file carries everything needed to run the improvement loop. The CLI reads it from the repo, generates agent instructions at runtime, executes the loop right there in the worktree. No external payloads, no config transfer, no special integrations.
 
 This means execution is trivially portable. Any system that can clone the repo and run `autoresearch run -m <marker> --headless` can execute markers. The CLI is the universal interface -- the same command for a human at their terminal, an AI agent in a pipeline, a CI/CD step, or a remote execution engine.
 
@@ -96,13 +96,13 @@ This is intentional. No integration layer means no integration maintenance. Any 
 
 ## What Success Looks Like
 
-1. I write a `.autoresearch.yaml` in any repo with a marker targeting flaky code
+1. I write a `.autoresearch/config.yaml` in any repo with a marker targeting flaky code
 2. I run `autoresearch` from my terminal, see the marker, press `r`
 3. The engine creates a worktree, loops overnight, runs 50-100 experiments
 4. I wake up to `results.tsv` showing the progression and a branch with the winning code
 5. I review, merge, done
 
-Or: an AI agent detects a degradation, writes a `.autoresearch.yaml` marker, triggers the engine via `--headless`, and resolves the issue before I even notice. That's the end state.
+Or: an AI agent detects a degradation, writes a `.autoresearch/config.yaml` marker, triggers the engine via `--headless`, and resolves the issue before I even notice. That's the end state.
 
 Or: I dispatch markers to agenticore overnight with a single headless command. No special payload, no custom integration. Agenticore just runs the CLI in the repo like any other task.
 

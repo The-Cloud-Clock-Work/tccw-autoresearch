@@ -12,6 +12,7 @@ from pathlib import Path
 from autoresearch.marker import Marker
 
 DEFAULT_AGENT_DIR = Path(__file__).parent / "agents" / "default"
+AUTORESEARCH_DIR = ".autoresearch"
 
 
 @dataclass
@@ -30,7 +31,7 @@ def resolve_agent_dir(repo_path: Path, agent_name: str) -> Path | None:
 
     Returns None if the agent doesn't exist in the repo.
     """
-    repo_agent_dir = repo_path / ".autoresearch" / "agents" / agent_name
+    repo_agent_dir = repo_path / AUTORESEARCH_DIR / "agents" / agent_name
     if repo_agent_dir.is_dir():
         return repo_agent_dir
     return None
@@ -62,6 +63,19 @@ def _load_agent_base(repo_path: Path, agent_name: str) -> tuple[dict, str, dict]
     return settings, claude_md, agent_env
 
 
+def _ensure_rules(target: list[str], rules: list[str]) -> None:
+    """Add rules to target list if not already present."""
+    for rule in rules:
+        if rule not in target:
+            target.append(rule)
+
+
+def _merge_tool_config(target: list[str], tools: list[str]) -> None:
+    """Merge tool rules from marker config, normalizing syntax."""
+    for tool in tools:
+        _ensure_rules(target, _normalize_tool_rules(tool))
+
+
 def generate_settings(marker: Marker, repo_path: Path | None = None) -> dict:
     """Generate settings.json from marker config.
 
@@ -81,38 +95,14 @@ def generate_settings(marker: Marker, repo_path: Path | None = None) -> dict:
 
     # Mutable files: agent CAN edit these
     for pattern in marker.target.mutable:
-        rule_edit = f"Edit({pattern})"
-        rule_write = f"Write({pattern})"
-        if rule_edit not in allow:
-            allow.append(rule_edit)
-        if rule_write not in allow:
-            allow.append(rule_write)
+        _ensure_rules(allow, [f"Edit({pattern})", f"Write({pattern})"])
 
-    # Immutable files: NOT added to allow → dontAsk auto-denies them
-    # No need to add to deny (dontAsk handles it, and deny would
-    # override allow if someone later adds the file to both lists)
+    # Agent always needs Read + Glob + Grep for context and exploration
+    _ensure_rules(allow, ["Read", "Grep", "Glob"])
 
-    # Agent always needs to read everything for context
-    if "Read" not in allow:
-        allow.append("Read")
-
-    # Glob/Grep for codebase exploration
-    if "Grep" not in allow:
-        allow.append("Grep")
-    if "Glob" not in allow:
-        allow.append("Glob")
-
-    # Merge allowed_tools from marker agent config (normalize syntax)
-    for tool in marker.agent.allowed_tools:
-        for normalized in _normalize_tool_rules(tool):
-            if normalized not in allow:
-                allow.append(normalized)
-
-    # Merge disallowed_tools into deny (normalize syntax)
-    for tool in marker.agent.disallowed_tools:
-        for normalized in _normalize_tool_rules(tool):
-            if normalized not in deny:
-                deny.append(normalized)
+    # Merge allowed/disallowed tools from marker agent config
+    _merge_tool_config(allow, marker.agent.allowed_tools)
+    _merge_tool_config(deny, marker.agent.disallowed_tools)
 
     return {
         "defaultMode": "dontAsk",
@@ -224,7 +214,7 @@ def init_autoresearch_dir(repo_path: Path) -> Path:
     Additive only — never overwrites existing files.
     Returns the .autoresearch/ path.
     """
-    ar_dir = repo_path / ".autoresearch"
+    ar_dir = repo_path / AUTORESEARCH_DIR
 
     # Walk the shipped default agent and copy everything that doesn't exist yet
     for src_file in DEFAULT_AGENT_DIR.rglob("*"):
@@ -276,7 +266,7 @@ def ensure_agent_dir(
     Uses the repo's .autoresearch/agents/<name>/ as base if it exists,
     otherwise falls back to the shipped default.
     """
-    agent_dir = worktree_path / ".autoresearch" / "agents" / marker_name
+    agent_dir = worktree_path / AUTORESEARCH_DIR / "agents" / marker_name
     logs_dir = agent_dir / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
 

@@ -36,6 +36,50 @@ class TelemetryReport:
     result_text: str | None = None
 
 
+def _handle_system_event(report: TelemetryReport, event: dict) -> None:
+    """Handle system/init event."""
+    if event.get("subtype") == "init":
+        report.session_id = event.get("session_id")
+        report.model = event.get("model")
+        report.permission_mode = event.get("permissionMode")
+        report.tools_available = event.get("tools", [])
+
+
+def _handle_assistant_event(report: TelemetryReport, event: dict) -> None:
+    """Handle assistant event — accumulate tool calls and token usage."""
+    msg = event.get("message", {})
+    for block in msg.get("content", []):
+        if block.get("type") == "tool_use":
+            tool_name = block.get("name", "")
+            report.tool_calls += 1
+            if tool_name and tool_name not in report.tools_used:
+                report.tools_used.append(tool_name)
+    usage = msg.get("usage", {})
+    report.input_tokens += usage.get("input_tokens", 0)
+    report.output_tokens += usage.get("output_tokens", 0)
+    report.cache_read_tokens += usage.get("cache_read_input_tokens", 0)
+    report.cache_creation_tokens += usage.get("cache_creation_input_tokens", 0)
+
+
+def _handle_result_event(report: TelemetryReport, event: dict) -> None:
+    """Handle result event — final summary."""
+    report.total_cost_usd = event.get("total_cost_usd", 0.0)
+    report.duration_ms = event.get("duration_ms", 0)
+    report.duration_api_ms = event.get("duration_api_ms", 0)
+    report.num_turns = event.get("num_turns", 0)
+    report.stop_reason = event.get("stop_reason")
+    report.is_error = event.get("is_error", False)
+    report.result_text = event.get("result")
+    report.permission_denials = event.get("permission_denials", [])
+
+
+_EVENT_HANDLERS = {
+    "system": _handle_system_event,
+    "assistant": _handle_assistant_event,
+    "result": _handle_result_event,
+}
+
+
 def parse_stream_json(output: str) -> TelemetryReport:
     """Parse stream-json output from claude CLI into a structured report."""
     report = TelemetryReport()
@@ -49,37 +93,9 @@ def parse_stream_json(output: str) -> TelemetryReport:
         except json.JSONDecodeError:
             continue
 
-        event_type = event.get("type")
-
-        if event_type == "system" and event.get("subtype") == "init":
-            report.session_id = event.get("session_id")
-            report.model = event.get("model")
-            report.permission_mode = event.get("permissionMode")
-            report.tools_available = event.get("tools", [])
-
-        elif event_type == "assistant":
-            msg = event.get("message", {})
-            for block in msg.get("content", []):
-                if block.get("type") == "tool_use":
-                    tool_name = block.get("name", "")
-                    report.tool_calls += 1
-                    if tool_name and tool_name not in report.tools_used:
-                        report.tools_used.append(tool_name)
-            usage = msg.get("usage", {})
-            report.input_tokens += usage.get("input_tokens", 0)
-            report.output_tokens += usage.get("output_tokens", 0)
-            report.cache_read_tokens += usage.get("cache_read_input_tokens", 0)
-            report.cache_creation_tokens += usage.get("cache_creation_input_tokens", 0)
-
-        elif event_type == "result":
-            report.total_cost_usd = event.get("total_cost_usd", 0.0)
-            report.duration_ms = event.get("duration_ms", 0)
-            report.duration_api_ms = event.get("duration_api_ms", 0)
-            report.num_turns = event.get("num_turns", 0)
-            report.stop_reason = event.get("stop_reason")
-            report.is_error = event.get("is_error", False)
-            report.result_text = event.get("result")
-            report.permission_denials = event.get("permission_denials", [])
+        handler = _EVENT_HANDLERS.get(event.get("type"))
+        if handler:
+            handler(report, event)
 
     return report
 

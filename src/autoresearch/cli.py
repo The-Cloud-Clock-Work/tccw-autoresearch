@@ -41,6 +41,8 @@ app = typer.Typer(
 
 console = Console()
 
+MARKER_ID_HELP = "Marker ID (repo:name)"
+
 # Daemon sub-app
 daemon_app = typer.Typer(help="Daemon management commands")
 app.add_typer(daemon_app, name="daemon")
@@ -52,11 +54,11 @@ def _init_ctx(ctx: typer.Context) -> None:
         ctx.obj = {}
 
 
-def _load_state(ctx: typer.Context):
+def _load_state(_ctx: typer.Context):
     return load_state()
 
 
-def _resolve_marker_data(tracked, config_path=None):
+def _resolve_marker_data(tracked, _config_path=None):
     """Load marker YAML data for a tracked marker. Returns (MarkerFile, Marker, effective_status) or Nones."""
     repo_path = Path(tracked.repo_path)
     mf_path = find_marker_file(repo_path)
@@ -185,7 +187,7 @@ def list_cmd(ctx: typer.Context):
 @app.command("status")
 def status_cmd(
     ctx: typer.Context,
-    marker: str = typer.Option(..., "--marker", "-m", help="Marker ID (repo:name)"),
+    marker: str = typer.Option(..., "--marker", "-m", help=MARKER_ID_HELP),
 ):
     """Show detailed status for a marker."""
     _init_ctx(ctx)
@@ -219,7 +221,7 @@ def status_cmd(
 @app.command("results")
 def results_cmd(
     ctx: typer.Context,
-    marker: str = typer.Option(..., "--marker", "-m", help="Marker ID (repo:name)"),
+    marker: str = typer.Option(..., "--marker", "-m", help=MARKER_ID_HELP),
 ):
     """Show experiment results for a marker."""
     _init_ctx(ctx)
@@ -249,7 +251,7 @@ def results_cmd(
 @app.command("ideas")
 def ideas_cmd(
     ctx: typer.Context,
-    marker: str = typer.Option(..., "--marker", "-m", help="Marker ID (repo:name)"),
+    marker: str = typer.Option(..., "--marker", "-m", help=MARKER_ID_HELP),
 ):
     """Show ideas backlog for a marker."""
     _init_ctx(ctx)
@@ -278,7 +280,7 @@ def ideas_cmd(
 @app.command("confidence")
 def confidence_cmd(
     ctx: typer.Context,
-    marker: str = typer.Option(..., "--marker", "-m", help="Marker ID (repo:name)"),
+    marker: str = typer.Option(..., "--marker", "-m", help=MARKER_ID_HELP),
 ):
     """Show confidence score for a marker."""
     _init_ctx(ctx)
@@ -564,6 +566,84 @@ def pause_cmd(
         console.print(f"[yellow]{marker}: {new_status}[/yellow]")
 
 
+def _resolve_run_targets(ctx: typer.Context, state, marker: Optional[str], repo: Optional[str]) -> list:
+    """Resolve the list of tracked markers to run, or raise typer.Exit on error."""
+    if marker:
+        tracked = get_tracked(state, marker)
+        if not tracked:
+            if is_headless(ctx):
+                headless_output(ctx, err_json(f"Marker not found: {marker}"))
+                raise typer.Exit(code=1)
+            console.print(f"[red]Marker not found: {marker}[/red]")
+            raise typer.Exit(code=1)
+        return [tracked]
+    # repo branch
+    to_run = [t for t in state.markers if t.repo_name == repo]
+    if not to_run:
+        if is_headless(ctx):
+            headless_output(ctx, err_json(f"No markers found for repo: {repo}"))
+            raise typer.Exit(code=1)
+        console.print(f"[red]No markers found for repo: {repo}[/red]")
+        raise typer.Exit(code=1)
+    return to_run
+
+
+def _execute_marker_run(t, state, repo: Optional[str], model: Optional[str], auto_merge: Optional[bool]) -> dict:
+    """Run a single tracked marker through the engine. Returns a result dict."""
+    from autoresearch.engine import EngineError, get_agent_runner, run_marker as engine_run
+
+    _mf, m, eff = _resolve_marker_data(t)
+    if not m:
+        return {"marker": t.id, "error": "Cannot load marker config"}
+
+    if repo and eff != MarkerStatus.ACTIVE:
+        return {}  # sentinel: skip this marker
+
+    if model:
+        m.agent.model = model
+    if auto_merge is not None:
+        m.auto_merge.enabled = auto_merge
+
+    try:
+        agent_runner = get_agent_runner(m)
+        run_result = engine_run(
+            repo_path=Path(t.repo_path),
+            marker=m,
+            state=state,
+            tracked=t,
+            agent_runner=agent_runner,
+        )
+        return {
+            "marker": run_result.marker_name,
+            "experiments": run_result.experiments,
+            "kept": run_result.kept,
+            "discarded": run_result.discarded,
+            "crashed": run_result.crashed,
+            "final_metric": run_result.final_metric,
+            "final_confidence": run_result.final_confidence,
+            "final_status": run_result.final_status,
+            "branch": run_result.branch,
+            "auto_merged": run_result.auto_merged,
+            "merge_target": run_result.merge_target,
+            "gate_chain": run_result.gate_chain_summary,
+        }
+    except EngineError as e:
+        return {"marker": t.id, "error": str(e)}
+
+
+def _print_run_results(results_list: list) -> None:
+    """Print run results to console."""
+    for r in results_list:
+        if "error" in r:
+            console.print(f"[red]{r['marker']}: {r['error']}[/red]")
+        else:
+            console.print(f"[green]{r['marker']}:[/green] {r['experiments']} experiments, {r['kept']} kept")
+            if r.get("gate_chain"):
+                console.print(f"  Gate chain: {r['gate_chain']}")
+            if r.get("auto_merged"):
+                console.print(f"  [green]Auto-merged into {r['merge_target']}[/green]")
+
+
 @app.command("run")
 def run_cmd(
     ctx: typer.Context,
@@ -574,7 +654,6 @@ def run_cmd(
 ):
     """Run experiment loop for a marker or all markers in a repo."""
     _init_ctx(ctx)
-    from autoresearch.engine import EngineError, get_agent_runner, run_marker as engine_run
 
     if not marker and not repo:
         if is_headless(ctx):
@@ -584,81 +663,18 @@ def run_cmd(
         raise typer.Exit(code=2)
 
     state = _load_state(ctx)
-
-    # Collect markers to run
-    to_run = []
-    if marker:
-        tracked = get_tracked(state, marker)
-        if not tracked:
-            if is_headless(ctx):
-                headless_output(ctx, err_json(f"Marker not found: {marker}"))
-                raise typer.Exit(code=1)
-            console.print(f"[red]Marker not found: {marker}[/red]")
-            raise typer.Exit(code=1)
-        to_run.append(tracked)
-    elif repo:
-        to_run = [t for t in state.markers if t.repo_name == repo]
-        if not to_run:
-            if is_headless(ctx):
-                headless_output(ctx, err_json(f"No markers found for repo: {repo}"))
-                raise typer.Exit(code=1)
-            console.print(f"[red]No markers found for repo: {repo}[/red]")
-            raise typer.Exit(code=1)
+    to_run = _resolve_run_targets(ctx, state, marker, repo)
 
     results_list = []
     for t in to_run:
-        _mf, m, eff = _resolve_marker_data(t)
-        if not m:
-            results_list.append({"marker": t.id, "error": "Cannot load marker config"})
-            continue
-
-        # Skip non-active markers in repo mode
-        if repo and eff != MarkerStatus.ACTIVE:
-            continue
-
-        if model:
-            m.agent.model = model
-        if auto_merge is not None:
-            m.auto_merge.enabled = auto_merge
-        try:
-            agent_runner = get_agent_runner(m)
-            run_result = engine_run(
-                repo_path=Path(t.repo_path),
-                marker=m,
-                state=state,
-                tracked=t,
-                agent_runner=agent_runner,
-            )
-            r_dict = {
-                "marker": run_result.marker_name,
-                "experiments": run_result.experiments,
-                "kept": run_result.kept,
-                "discarded": run_result.discarded,
-                "crashed": run_result.crashed,
-                "final_metric": run_result.final_metric,
-                "final_confidence": run_result.final_confidence,
-                "final_status": run_result.final_status,
-                "branch": run_result.branch,
-                "auto_merged": run_result.auto_merged,
-                "merge_target": run_result.merge_target,
-                "gate_chain": run_result.gate_chain_summary,
-            }
-            results_list.append(r_dict)
-        except EngineError as e:
-            results_list.append({"marker": t.id, "error": str(e)})
+        r = _execute_marker_run(t, state, repo, model, auto_merge)
+        if r:  # empty dict = skipped (non-active in repo mode)
+            results_list.append(r)
 
     if is_headless(ctx):
         headless_output(ctx, ok_json(results_list))
     else:
-        for r in results_list:
-            if "error" in r:
-                console.print(f"[red]{r['marker']}: {r['error']}[/red]")
-            else:
-                console.print(f"[green]{r['marker']}:[/green] {r['experiments']} experiments, {r['kept']} kept")
-                if r.get("gate_chain"):
-                    console.print(f"  Gate chain: {r['gate_chain']}")
-                if r.get("auto_merged"):
-                    console.print(f"  [green]Auto-merged into {r['merge_target']}[/green]")
+        _print_run_results(results_list)
 
 
 @app.command("finalize")
@@ -742,6 +758,40 @@ def merge_cmd(
 # Interactive TUI
 # ---------------------------------------------------------------------------
 
+def _build_main_menu(state) -> tuple[list[str], str]:
+    """Return (choices, prompt_text) for the main interactive menu."""
+    if not state.markers:
+        return ["a", "p", "q"], "[a] Add from CWD  [p] Add by path  [q] Quit"
+    n = len(state.markers)
+    choices = [str(i) for i in range(1, n + 1)] + ["a", "p", "d", "r", "R", "q"]
+    prompt_text = f"[1-{n}] Select  [a] Add  [p] Path  [d] Detach  [r] Run  [R] Run repo  [q] Quit"
+    return choices, prompt_text
+
+
+def _dispatch_main_action(ctx: typer.Context, state, action: str, cwd: Path) -> bool:
+    """Handle a main-menu action. Returns False to quit, True to continue."""
+    from rich.prompt import Prompt
+
+    if action == "q":
+        return False
+    if action == "a":
+        _action_add(ctx, cwd)
+    elif action == "p":
+        path_str = Prompt.ask("Repo path")
+        _action_add(ctx, Path(path_str))
+    elif action == "d":
+        _action_detach_interactive(ctx, state)
+    elif action == "r":
+        _action_run_selected_interactive(ctx, state)
+    elif action == "R":
+        _action_run_repo_interactive(ctx, state)
+    elif action.isdigit():
+        idx = int(action) - 1
+        if 0 <= idx < len(state.markers):
+            _marker_submenu(ctx, state.markers[idx])
+    return True
+
+
 def _interactive_main(ctx: typer.Context):
     """Main interactive loop with context-aware views."""
     from rich.prompt import Prompt
@@ -749,7 +799,6 @@ def _interactive_main(ctx: typer.Context):
     while True:
         state = _load_state(ctx)
 
-        # Context detection: are we in a repo with .autoresearch/config.yaml?
         cwd = Path.cwd()
         marker_file_path = find_marker_file(cwd)
 
@@ -760,32 +809,11 @@ def _interactive_main(ctx: typer.Context):
 
         if not state.markers:
             console.print("\n[dim]No markers tracked.[/dim]")
-            choices = ["a", "p", "q"]
-            prompt_text = "[a] Add from CWD  [p] Add by path  [q] Quit"
-        else:
-            n = len(state.markers)
-            choices = [str(i) for i in range(1, n + 1)] + ["a", "p", "d", "r", "R", "q"]
-            prompt_text = f"[1-{n}] Select  [a] Add  [p] Path  [d] Detach  [r] Run  [R] Run repo  [q] Quit"
 
+        choices, prompt_text = _build_main_menu(state)
         action = Prompt.ask(f"\n{prompt_text}", choices=choices)
-
-        if action == "q":
+        if not _dispatch_main_action(ctx, state, action, cwd):
             break
-        elif action == "a":
-            _action_add(ctx, cwd)
-        elif action == "p":
-            path_str = Prompt.ask("Repo path")
-            _action_add(ctx, Path(path_str))
-        elif action == "d":
-            _action_detach_interactive(ctx, state)
-        elif action == "r":
-            _action_run_selected_interactive(ctx, state)
-        elif action == "R":
-            _action_run_repo_interactive(ctx, state)
-        elif action.isdigit():
-            idx = int(action) - 1
-            if 0 <= idx < len(state.markers):
-                _marker_submenu(ctx, state.markers[idx])
 
 
 def _home_mode(ctx: typer.Context, state):
@@ -904,7 +932,7 @@ def _run_single_marker(ctx: typer.Context, tracked):
     """Run a single marker through the engine."""
     from autoresearch.engine import EngineError, get_agent_runner, run_marker
 
-    _mf, marker, eff = _resolve_marker_data(tracked)
+    _mf, marker, _ = _resolve_marker_data(tracked)
     if not marker:
         console.print(f"[red]Cannot load marker config for {tracked.id}[/red]")
         return
@@ -932,7 +960,7 @@ def _run_repo_markers(ctx: typer.Context, state, repo_name: str):
     for tracked in state.markers:
         if tracked.repo_name != repo_name:
             continue
-        _mf, marker, eff = _resolve_marker_data(tracked)
+        _mf, _, eff = _resolve_marker_data(tracked)
         if eff == MarkerStatus.ACTIVE:
             console.print(f"\n[bold]Running {tracked.id}...[/bold]")
             _run_single_marker(ctx, tracked)
@@ -942,6 +970,52 @@ def _run_repo_markers(ctx: typer.Context, state, repo_name: str):
 # Marker submenu
 # ---------------------------------------------------------------------------
 
+def _build_marker_detail_panel(tracked, marker, eff) -> list[str]:
+    """Build info lines for the marker detail panel."""
+    status_label = eff.value if eff else "unknown"
+    info_lines = [f"Status: {status_label}"]
+    if tracked.baseline is not None:
+        info_lines.append(f"Baseline: {tracked.baseline}")
+    if tracked.current is not None:
+        info_lines.append(f"Current: {tracked.current}")
+    if marker and marker.metric.target is not None:
+        info_lines.append(f"Target: {marker.metric.target}")
+    if marker:
+        info_lines.append(f"Direction: {marker.metric.direction.value}")
+    if tracked.branch:
+        info_lines.append(f"Branch: {tracked.branch}")
+    return info_lines
+
+
+def _dispatch_submenu_action(ctx: typer.Context, tracked, marker, eff, action: str) -> bool:
+    """Handle a marker submenu action. Returns False to go back, True to continue."""
+    if action == "q":
+        return False
+    if action == "r":
+        _run_single_marker(ctx, tracked)
+    elif action == "s":
+        _show_status_interactive(tracked, marker, eff)
+    elif action == "t":
+        _show_results_interactive(tracked)
+    elif action == "k":
+        _toggle_skip(ctx, tracked, marker)
+    elif action == "p":
+        _toggle_pause(ctx, tracked, marker)
+    elif action == "e":
+        _edit_config(tracked)
+    elif action == "b":
+        _show_branch(tracked)
+    elif action == "i":
+        _show_ideas_interactive(tracked)
+    elif action == "c":
+        _show_confidence_interactive(tracked)
+    elif action == "f":
+        _finalize_interactive(ctx, tracked)
+    elif action == "m":
+        _merge_interactive(ctx, tracked)
+    return True
+
+
 def _marker_submenu(ctx: typer.Context, tracked):
     """Interactive submenu for a selected marker."""
     from rich.panel import Panel
@@ -949,51 +1023,14 @@ def _marker_submenu(ctx: typer.Context, tracked):
 
     while True:
         _mf, marker, eff = _resolve_marker_data(tracked)
-        status_label = eff.value if eff else "unknown"
-
-        # Detail panel
-        info_lines = [f"Status: {status_label}"]
-        if tracked.baseline is not None:
-            info_lines.append(f"Baseline: {tracked.baseline}")
-        if tracked.current is not None:
-            info_lines.append(f"Current: {tracked.current}")
-        if marker and marker.metric.target is not None:
-            info_lines.append(f"Target: {marker.metric.target}")
-        if marker:
-            info_lines.append(f"Direction: {marker.metric.direction.value}")
-        if tracked.branch:
-            info_lines.append(f"Branch: {tracked.branch}")
-
+        info_lines = _build_marker_detail_panel(tracked, marker, eff)
         console.print(Panel("\n".join(info_lines), title=tracked.id, border_style="blue"))
 
         choices = ["r", "s", "t", "k", "p", "e", "b", "i", "c", "f", "m", "q"]
         prompt_text = "[r] Run  [s] Status  [t] Results  [k] Skip  [p] Pause  [e] Edit  [b] Branch  [i] Ideas  [c] Confidence  [f] Finalize  [m] Merge  [q] Back"
         action = Prompt.ask(prompt_text, choices=choices)
-
-        if action == "q":
+        if not _dispatch_submenu_action(ctx, tracked, marker, eff, action):
             break
-        elif action == "r":
-            _run_single_marker(ctx, tracked)
-        elif action == "s":
-            _show_status_interactive(tracked, marker, eff)
-        elif action == "t":
-            _show_results_interactive(tracked)
-        elif action == "k":
-            _toggle_skip(ctx, tracked, marker)
-        elif action == "p":
-            _toggle_pause(ctx, tracked, marker)
-        elif action == "e":
-            _edit_config(tracked)
-        elif action == "b":
-            _show_branch(tracked)
-        elif action == "i":
-            _show_ideas_interactive(tracked)
-        elif action == "c":
-            _show_confidence_interactive(tracked)
-        elif action == "f":
-            _finalize_interactive(ctx, tracked)
-        elif action == "m":
-            _merge_interactive(ctx, tracked)
 
 
 def _show_status_interactive(tracked, marker, eff):
@@ -1220,12 +1257,67 @@ def daemon_stop(ctx: typer.Context):
             console.print("[yellow]No daemon running[/yellow]")
 
 
+def _compute_next_fire(cron_expr: str, last_run: Optional[str]) -> Optional[str]:
+    """Compute the next scheduled fire time from a cron expression and last run timestamp."""
+    from croniter import croniter
+    from datetime import datetime, timezone
+
+    if not last_run:
+        return None
+    try:
+        last_dt = datetime.fromisoformat(last_run)
+        if last_dt.tzinfo is None:
+            last_dt = last_dt.replace(tzinfo=timezone.utc)
+        return croniter(cron_expr, last_dt).get_next(datetime).isoformat()
+    except (ValueError, KeyError):
+        return None
+
+
+def _collect_scheduled_markers(state) -> list[dict]:
+    """Build the list of scheduled marker dicts from tracked state."""
+    from autoresearch.daemon import _resolve_cron_expression
+
+    scheduled = []
+    for tracked in state.markers:
+        _mf, marker, _ = _resolve_marker_data(tracked)
+        if not marker:
+            continue
+        cron_expr = _resolve_cron_expression(marker.schedule)
+        if cron_expr:
+            scheduled.append({
+                "marker": tracked.id,
+                "schedule_type": marker.schedule.type,
+                "cron": cron_expr,
+                "next_run": _compute_next_fire(cron_expr, tracked.last_run),
+                "last_run": tracked.last_run,
+            })
+    return scheduled
+
+
+def _print_daemon_status(running: bool, pid, state, scheduled: list[dict]) -> None:
+    """Render daemon status to console."""
+    status_text = "[green]running[/green]" if running else "[dim]stopped[/dim]"
+    console.print(f"Daemon: {status_text}" + (f" (PID {pid})" if pid else ""))
+    if state.daemon.started_at:
+        console.print(f"Started: {state.daemon.started_at}")
+    if scheduled:
+        table = Table(title="Scheduled Markers")
+        table.add_column("Marker")
+        table.add_column("Schedule")
+        table.add_column("Next Run")
+        table.add_column("Last Run")
+        for s in scheduled:
+            table.add_row(s["marker"], s["cron"], s["next_run"] or "--", s["last_run"] or "--")
+        console.print(table)
+    else:
+        console.print("[dim]No scheduled markers.[/dim]")
+
+
 @daemon_app.command("status")
 def daemon_status(ctx: typer.Context):
     """Show daemon status and scheduled markers."""
     _init_ctx(ctx)
     from autoresearch.daemon import (
-        _resolve_cron_expression,
         check_stale_pid,
         is_pid_alive,
         read_pid,
@@ -1235,33 +1327,7 @@ def daemon_status(ctx: typer.Context):
     pid = read_pid()
     running = pid is not None and is_pid_alive(pid)
     state = _load_state(ctx)
-
-    scheduled = []
-    for tracked in state.markers:
-        _mf, marker, eff = _resolve_marker_data(tracked)
-        if not marker:
-            continue
-        cron_expr = _resolve_cron_expression(marker.schedule)
-        if cron_expr:
-            from croniter import croniter
-            from datetime import datetime, timezone
-
-            next_fire = None
-            if tracked.last_run:
-                try:
-                    last_dt = datetime.fromisoformat(tracked.last_run)
-                    if last_dt.tzinfo is None:
-                        last_dt = last_dt.replace(tzinfo=timezone.utc)
-                    next_fire = croniter(cron_expr, last_dt).get_next(datetime).isoformat()
-                except (ValueError, KeyError):
-                    pass
-            scheduled.append({
-                "marker": tracked.id,
-                "schedule_type": marker.schedule.type,
-                "cron": cron_expr,
-                "next_run": next_fire,
-                "last_run": tracked.last_run,
-            })
+    scheduled = _collect_scheduled_markers(state)
 
     data = {
         "running": running,
@@ -1273,21 +1339,7 @@ def daemon_status(ctx: typer.Context):
     if is_headless(ctx):
         headless_output(ctx, ok_json(data))
     else:
-        status_text = "[green]running[/green]" if running else "[dim]stopped[/dim]"
-        console.print(f"Daemon: {status_text}" + (f" (PID {pid})" if pid else ""))
-        if state.daemon.started_at:
-            console.print(f"Started: {state.daemon.started_at}")
-        if scheduled:
-            table = Table(title="Scheduled Markers")
-            table.add_column("Marker")
-            table.add_column("Schedule")
-            table.add_column("Next Run")
-            table.add_column("Last Run")
-            for s in scheduled:
-                table.add_row(s["marker"], s["cron"], s["next_run"] or "--", s["last_run"] or "--")
-            console.print(table)
-        else:
-            console.print("[dim]No scheduled markers.[/dim]")
+        _print_daemon_status(running, pid, state, scheduled)
 
 
 @daemon_app.command("logs")

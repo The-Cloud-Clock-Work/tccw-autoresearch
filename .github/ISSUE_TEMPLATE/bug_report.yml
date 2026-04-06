@@ -1,0 +1,54 @@
+name: Bug Report
+description: Report a bug in AutoResearch
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened? What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Minimal steps to reproduce the issue
+      placeholder: |
+        1. pip install tccw-autoresearch
+        2. autoresearch init
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Marker Config
+      description: Your `.autoresearch/config.yaml` (redact sensitive paths)
+      render: yaml
+  - type: input
+    id: version
+    attributes:
+      label: AutoResearch Version
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  - type: input
+    id: claude-version
+    attributes:
+      label: Claude Code Version
+      placeholder: "claude --version output"
+  - type: input
+    id: python-version
+    attributes:
+      label: Python Version
+      placeholder: "3.12"
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - macOS
+        - Linux
+        - Windows (WSL)
+        - Other

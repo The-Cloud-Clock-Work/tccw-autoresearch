@@ -173,55 +173,8 @@ class ClaudeCodeRunner(AgentRunner):
         paths = ensure_agent_dir(worktree_path, self.marker.name, self.marker)
         timeout_seconds = _parse_budget(budget)
 
-        model = self.agent_config.model or self.marker.loop.model or "sonnet"
-
-        # Run claude from the agent dir (inherits its CLAUDE.md, .claude/settings, rules, etc.)
-        # Append the default agent's CLAUDE.md as base instructions for all agents
-        # Use --add-dir to give access to the actual worktree
-        default_claude_md = DEFAULT_AGENT_DIR / "CLAUDE.md"
-
-        cmd = [
-            "claude", "-p", program,
-            "--model", model,
-            "--permission-mode", self.agent_config.permission_mode,
-            "--add-dir", str(worktree_path),
-            "--output-format", "stream-json",
-            "--verbose",
-            "--debug-file", str(paths.debug_log_path),
-        ]
-
-        # Inject default agent's CLAUDE.md into all agents
-        if default_claude_md.is_file():
-            cmd.extend(["--append-system-prompt-file", str(default_claude_md)])
-
-        if self.agent_config.effort:
-            cmd.extend(["--effort", self.agent_config.effort])
-
-        # Build permission flags from marker config (mutable/immutable + agent tools)
-        allowed_tools, disallowed_tools = build_cli_permission_flags(self.marker, worktree_path)
-        if allowed_tools:
-            cmd.extend(["--allowedTools", *allowed_tools])
-        if disallowed_tools:
-            cmd.extend(["--disallowedTools", *disallowed_tools])
-
-        cmd.extend(self.agent_config.extra_flags)
-
-        # Load env from agent profile settings.json (OTEL, telemetry, etc.)
-        env = dict(os.environ)
-        if paths.env:
-            env.update(paths.env)
-
-        # Load .env from agent dir if it exists (overrides settings.json env)
-        dot_env = paths.agent_dir / ".env"
-        if dot_env.is_file():
-            for line in dot_env.read_text().splitlines():
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    key, _, value = line.partition("=")
-                    env[key.strip()] = value.strip()
-
-        # Set budget deadline for the countdown hook
-        env["AUTORESEARCH_BUDGET_END"] = str(int(time.time()) + timeout_seconds)
+        cmd = self._build_cmd(program, worktree_path, paths, DEFAULT_AGENT_DIR, build_cli_permission_flags)
+        env = self._build_env(paths, timeout_seconds)
 
         logger.info(f"Agent cmd: {' '.join(cmd[:6])}...")
         logger.debug(f"Agent cwd: {paths.agent_dir}")
@@ -268,6 +221,60 @@ class ClaudeCodeRunner(AgentRunner):
                 exit_code=-1,
                 output=partial[-2000:] if partial else "TIMEOUT",
             )
+
+    def _build_cmd(
+        self,
+        program: str,
+        worktree_path: Path,
+        paths,
+        default_agent_dir,
+        build_cli_permission_flags,
+    ) -> list[str]:
+        """Build the claude CLI command list."""
+        model = self.agent_config.model or self.marker.loop.model or "sonnet"
+        default_claude_md = default_agent_dir / "CLAUDE.md"
+
+        cmd = [
+            "claude", "-p", program,
+            "--model", model,
+            "--permission-mode", self.agent_config.permission_mode,
+            "--add-dir", str(worktree_path),
+            "--output-format", "stream-json",
+            "--verbose",
+            "--debug-file", str(paths.debug_log_path),
+        ]
+
+        if default_claude_md.is_file():
+            cmd.extend(["--append-system-prompt-file", str(default_claude_md)])
+
+        if self.agent_config.effort:
+            cmd.extend(["--effort", self.agent_config.effort])
+
+        allowed_tools, disallowed_tools = build_cli_permission_flags(self.marker, worktree_path)
+        if allowed_tools:
+            cmd.extend(["--allowedTools", *allowed_tools])
+        if disallowed_tools:
+            cmd.extend(["--disallowedTools", *disallowed_tools])
+
+        cmd.extend(self.agent_config.extra_flags)
+        return cmd
+
+    def _build_env(self, paths, timeout_seconds: int) -> dict[str, str]:
+        """Build the environment dict for the agent subprocess."""
+        env = dict(os.environ)
+        if paths.env:
+            env.update(paths.env)
+
+        dot_env = paths.agent_dir / ".env"
+        if dot_env.is_file():
+            for line in dot_env.read_text().splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, _, value = line.partition("=")
+                    env[key.strip()] = value.strip()
+
+        env["AUTORESEARCH_BUDGET_END"] = str(int(time.time()) + timeout_seconds)
+        return env
 
 
 def get_agent_runner(marker: "Marker") -> AgentRunner:
@@ -333,40 +340,18 @@ def run_marker(
                 final_status = "halted"
                 break
 
-            # Generate program
-            results_summary = _format_results_for_program(results)
-            ideas_content = read_ideas(wt_info.path, marker.name)
-            program = generate_program(
-                marker, current_best, results_summary, ideas_content, esc.escalation_level,
-                repo_path=repo_path,
+            # Generate program and invoke agent
+            agent_result, commit_hash = _run_agent_step(
+                wt_info.path, repo_path, marker, agent_runner, results, current_best, esc,
             )
 
-            # Invoke agent
-            agent_result = agent_runner.invoke(
-                wt_info.path, program, marker.loop.budget_per_experiment
-            )
-
-            # Commit changes — always attempt, even on timeout/failure.
-            # The agent may have edited files without committing.
-            commit_hash = git_commit(wt_info.path, agent_result.description or "experiment")
-
-            if not commit_hash:
-                # No changes made or agent failed
+            if commit_hash is None:
                 discarded += 1
-                esc.on_discard()
-                append_result(wt_info.path, marker.name, ExperimentResult(
-                    commit="-------",
-                    metric=0,
-                    guard="--",
-                    status="discard",
-                    confidence="--",
-                    description=agent_result.description or "no changes made",
-                ))
                 results = read_results(wt_info.path, marker.name)
                 logger.info(f"Exp {exp_num}: discard (no changes)")
                 continue
 
-            # Run harness
+            # Run harness to get new metric
             timeout_sec = _parse_budget(marker.loop.budget_per_experiment)
             harness_result = run_harness(
                 marker.metric.command,
@@ -376,7 +361,6 @@ def run_marker(
                 timeout_seconds=timeout_sec,
             )
 
-            # Crash handling
             if harness_result.metric is None:
                 crashed += 1
                 esc.on_crash()
@@ -396,59 +380,28 @@ def run_marker(
 
             new_metric = harness_result.metric
 
-            # Gate 1: metric improved?
+            # Gate 1: metric gate
             if not is_improved(new_metric, current_best, marker.metric.direction.value):
+                _record_discard_metric(
+                    wt_info.path, repo_path, marker, agent_result, commit_hash,
+                    new_metric, snapshot_ref, esc,
+                )
                 discarded += 1
-                esc.on_discard()
-                _reset_to_before_commit(wt_info.path, commit_hash)
-                _run_restore(repo_path, marker, snapshot_ref)
-                _write_discard_idea(wt_info.path, marker.name, agent_result.description, new_metric)
-                _write_telemetry_feedback(wt_info.path, marker.name, agent_result)
-                append_result(wt_info.path, marker.name, ExperimentResult(
-                    commit=commit_hash,
-                    metric=new_metric,
-                    guard="--",
-                    status="discard",
-                    confidence="--",
-                    description=agent_result.description,
-                ))
                 results = read_results(wt_info.path, marker.name)
                 logger.info(f"Exp {exp_num}: discard (metric {new_metric} not better than {current_best})")
                 continue
 
-            # Gate 2: guard passes?
-            guard_status = "pass"
-            if marker.guard and marker.guard.command:
-                guard_result = run_guard(
-                    marker.guard.command,
-                    marker.guard.extract,
-                    marker.guard.threshold,
-                    wt_info.path,
-                    timeout_seconds=timeout_sec,
-                )
-                if not guard_result.passed:
-                    # Rework loop
-                    fixed = _handle_guard_failure(
-                        wt_info.path, marker, agent_runner, guard_result,
-                        marker.guard.rework_attempts,
-                    )
-                    if not fixed:
-                        discarded += 1
-                        esc.on_discard()
-                        _reset_to_before_commit(wt_info.path, commit_hash)
-                        _run_restore(repo_path, marker, snapshot_ref)
-                        guard_status = "fail"
-                        append_result(wt_info.path, marker.name, ExperimentResult(
-                            commit=commit_hash,
-                            metric=new_metric,
-                            guard="fail",
-                            status="discard",
-                            confidence="--",
-                            description=f"{agent_result.description} (guard failed after rework)",
-                        ))
-                        results = read_results(wt_info.path, marker.name)
-                        logger.info(f"Exp {exp_num}: discard (guard failed)")
-                        continue
+            # Gate 2: guard gate
+            guard_status = _run_guard_gate(
+                wt_info.path, repo_path, marker, agent_runner,
+                commit_hash, new_metric, snapshot_ref, timeout_sec, agent_result, esc,
+            )
+
+            if guard_status is None:
+                discarded += 1
+                results = read_results(wt_info.path, marker.name)
+                logger.info(f"Exp {exp_num}: discard (guard failed)")
+                continue
 
             # KEEP
             kept += 1
@@ -543,7 +496,7 @@ def _publish_results(
     marker: "Marker",
     result: RunResult,
     source_branch: str,
-    results: list,
+    _results: list,
 ) -> None:
     """Push branch, create PR to dev (auto-merge), optionally PR to main.
 
@@ -686,6 +639,127 @@ def _create_promotion_pr(
 
     except Exception:
         logger.exception("Failed to create promotion PR")
+
+
+def _run_agent_step(
+    worktree_path: Path,
+    repo_path: Path,
+    marker: Marker,
+    agent_runner: AgentRunner,
+    results: list,
+    current_best: float,
+    esc: EscalationState,
+) -> tuple[AgentResult, str | None]:
+    """Generate a program, invoke the agent, and commit any changes.
+
+    Returns (agent_result, commit_hash).  commit_hash is None when no
+    changes were made or the agent failed without producing a diff.
+    """
+    results_summary = _format_results_for_program(results)
+    ideas_content = read_ideas(worktree_path, marker.name)
+    program = generate_program(
+        marker, current_best, results_summary, ideas_content, esc.escalation_level,
+        repo_path=repo_path,
+    )
+
+    agent_result = agent_runner.invoke(
+        worktree_path, program, marker.loop.budget_per_experiment
+    )
+
+    commit_hash = git_commit(worktree_path, agent_result.description or "experiment")
+
+    if not commit_hash:
+        esc.on_discard()
+        append_result(worktree_path, marker.name, ExperimentResult(
+            commit="-------",
+            metric=0,
+            guard="--",
+            status="discard",
+            confidence="--",
+            description=agent_result.description or "no changes made",
+        ))
+        return agent_result, None
+
+    return agent_result, commit_hash
+
+
+def _record_discard_metric(
+    worktree_path: Path,
+    repo_path: Path,
+    marker: Marker,
+    agent_result: AgentResult,
+    commit_hash: str,
+    new_metric: float,
+    snapshot_ref: str | None,
+    esc: EscalationState,
+) -> None:
+    """Record a metric-gate discard: reset worktree, write ideas/feedback, append result."""
+    esc.on_discard()
+    _reset_to_before_commit(worktree_path, commit_hash)
+    _run_restore(repo_path, marker, snapshot_ref)
+    _write_discard_idea(worktree_path, marker.name, agent_result.description, new_metric)
+    _write_telemetry_feedback(worktree_path, marker.name, agent_result)
+    append_result(worktree_path, marker.name, ExperimentResult(
+        commit=commit_hash,
+        metric=new_metric,
+        guard="--",
+        status="discard",
+        confidence="--",
+        description=agent_result.description,
+    ))
+
+
+def _run_guard_gate(
+    worktree_path: Path,
+    repo_path: Path,
+    marker: Marker,
+    agent_runner: AgentRunner,
+    commit_hash: str,
+    new_metric: float,
+    snapshot_ref: str | None,
+    timeout_sec: int,
+    agent_result: AgentResult,
+    esc: EscalationState,
+) -> str | None:
+    """Run the guard gate and attempt rework on failure.
+
+    Returns the guard_status string ("pass") on success, or None on failure.
+    Side-effects on failure: resets worktree, appends discard result, calls esc.on_discard().
+    """
+    if not (marker.guard and marker.guard.command):
+        return "pass"
+
+    guard_result = run_guard(
+        marker.guard.command,
+        marker.guard.extract,
+        marker.guard.threshold,
+        worktree_path,
+        timeout_seconds=timeout_sec,
+    )
+
+    if guard_result.passed:
+        return "pass"
+
+    fixed = _handle_guard_failure(
+        worktree_path, marker, agent_runner, guard_result,
+        marker.guard.rework_attempts,
+    )
+
+    if fixed:
+        return "pass"
+
+    esc.on_discard()
+    _reset_to_before_commit(worktree_path, commit_hash)
+    _run_restore(repo_path, marker, snapshot_ref)
+    append_result(worktree_path, marker.name, ExperimentResult(
+        commit=commit_hash,
+        metric=new_metric,
+        guard="fail",
+        status="discard",
+        confidence="--",
+        description=f"{agent_result.description} (guard failed after rework)",
+    ))
+    return None
 
 
 def _handle_guard_failure(
