@@ -179,7 +179,18 @@ Update `metric.baseline` in the config with the measured value.
 
 ---
 
-## Step 13: Summary & Next Steps (AI-JUDGMENT)
+## Step 13: Register Marker
+
+<!-- DETERMINISTIC: register the marker in autoresearch state so `run` can find it -->
+```bash
+"$SKILL_DIR"/scripts/05_register_marker.sh <repo-path>
+```
+
+This makes the marker available to `autoresearch run -m <repo>:<marker>`.
+
+---
+
+## Step 14: Summary & Next Steps (AI-JUDGMENT)
 
 Show the user:
 
