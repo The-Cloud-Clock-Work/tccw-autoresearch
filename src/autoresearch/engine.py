@@ -519,7 +519,23 @@ def _publish_results(
         logger.warning(f"Push failed: {push_result.stderr[:200]}")
         return
 
-    # 2. Create PR: experiment branch → dev (auto-merge via gh)
+    # 2. Ensure target branch exists on remote
+    check_branch = subprocess.run(
+        ["git", "ls-remote", "--heads", "origin", target],
+        cwd=repo_path, capture_output=True, text=True, timeout=15,
+    )
+    if not check_branch.stdout.strip():
+        logger.info(f"Target branch '{target}' not on remote — creating from HEAD")
+        subprocess.run(
+            ["git", "branch", target],
+            cwd=repo_path, capture_output=True, text=True,
+        )
+        subprocess.run(
+            ["git", "push", "origin", target],
+            cwd=repo_path, capture_output=True, text=True, timeout=30,
+        )
+
+    # 3. Create PR: experiment branch → target (auto-merge via gh)
     title = f"[autoresearch] {marker.name}: {result.kept} fix(es), {result.final_metric} errors"
     body = (
         f"## Autoresearch Experiment\n\n"
