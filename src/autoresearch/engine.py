@@ -182,6 +182,7 @@ class ClaudeCodeRunner(AgentRunner):
             result = subprocess.run(
                 cmd,
                 cwd=str(paths.agent_dir),  # run FROM the agent dir
+                stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
                 timeout=timeout_seconds,
