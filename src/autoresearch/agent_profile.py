@@ -232,7 +232,7 @@ def init_autoresearch_dir(repo_path: Path) -> Path:
         gitignore_path.write_text(
             "# Autoresearch runtime artifacts — do not commit\n"
             "state.json\n"
-            "*/logs/\n"
+            "**/logs/\n"
         )
 
     # Symlink default agent files into all custom agents
@@ -285,7 +285,7 @@ def ensure_agent_dir(
         gitignore_path.write_text(
             "# Autoresearch runtime artifacts — do not commit\n"
             "state.json\n"
-            "*/logs/\n"
+            "**/logs/\n"
         )
 
     settings = generate_settings(marker, worktree_path)
