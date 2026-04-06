@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -93,6 +94,23 @@ class RunResult:
     auto_merged: bool = False
     merge_target: str | None = None
     gate_chain_summary: str | None = None
+
+
+@dataclass
+class ExperimentProgress:
+    """Per-experiment progress update for live UX callbacks."""
+
+    exp_num: int
+    max_experiments: int
+    status: str  # "running" | "keep" | "discard" | "crash"
+    metric: float | None = None
+    previous_best: float | None = None
+    current_best: float | None = None
+    kept: int = 0
+    discarded: int = 0
+    crashed: int = 0
+    description: str = ""
+    escalation_level: str = "normal"
 
 
 @dataclass
@@ -292,6 +310,7 @@ def run_marker(
     state_path: Path | None = None,
     worktree_base: Path | None = None,
     cleanup_worktree: bool = True,
+    on_experiment: Callable | None = None,
 ) -> RunResult:
     """Run the experiment loop for a single marker.
 
@@ -330,9 +349,26 @@ def run_marker(
     final_status = "budget_exhausted"
     max_experiments = marker.loop.max_experiments
 
+    def _notify(exp_num: int, status: str, metric: float | None = None, desc: str = ""):
+        if on_experiment:
+            on_experiment(ExperimentProgress(
+                exp_num=exp_num,
+                max_experiments=max_experiments,
+                status=status,
+                metric=metric,
+                previous_best=current_best if status != "keep" else None,
+                current_best=current_best,
+                kept=kept,
+                discarded=discarded,
+                crashed=crashed,
+                description=desc,
+                escalation_level=esc.escalation_level,
+            ))
+
     try:
         for exp_num in range(1, max_experiments + 1):
             esc.current_experiment = exp_num
+            _notify(exp_num, "running")
             snapshot_ref = _run_snapshot(repo_path, marker, exp_num)
 
             # Check for HALT
@@ -348,6 +384,7 @@ def run_marker(
 
             if commit_hash is None:
                 discarded += 1
+                _notify(exp_num, "discard", desc=agent_result.description or "no changes")
                 results = read_results(wt_info.path, marker.name)
                 logger.info(f"Exp {exp_num}: discard (no changes)")
                 continue
@@ -376,6 +413,7 @@ def run_marker(
                     description=agent_result.description,
                 ))
                 results = read_results(wt_info.path, marker.name)
+                _notify(exp_num, "crash", desc=agent_result.description or "metric extraction failed")
                 logger.info(f"Exp {exp_num}: crash")
                 continue
 
@@ -388,6 +426,7 @@ def run_marker(
                     new_metric, snapshot_ref, esc,
                 )
                 discarded += 1
+                _notify(exp_num, "discard", metric=new_metric, desc=agent_result.description or "metric not improved")
                 results = read_results(wt_info.path, marker.name)
                 logger.info(f"Exp {exp_num}: discard (metric {new_metric} not better than {current_best})")
                 continue
@@ -400,6 +439,7 @@ def run_marker(
 
             if guard_status is None:
                 discarded += 1
+                _notify(exp_num, "discard", metric=new_metric, desc=agent_result.description or "guard failed")
                 results = read_results(wt_info.path, marker.name)
                 logger.info(f"Exp {exp_num}: discard (guard failed)")
                 continue
@@ -422,6 +462,7 @@ def run_marker(
                 description=agent_result.description,
             ))
             results = read_results(wt_info.path, marker.name)
+            _notify(exp_num, "keep", metric=new_metric, desc=agent_result.description or "improvement kept")
             logger.info(f"Exp {exp_num}: KEEP (metric {new_metric}, conf {conf_str})")
 
             # Check target reached

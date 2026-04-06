@@ -588,6 +588,126 @@ def _resolve_run_targets(ctx: typer.Context, state, marker: Optional[str], repo:
     return to_run
 
 
+def _build_progress_panel(marker_id: str, marker, history: list):
+    """Build a Rich Panel with live experiment progress."""
+    from rich.panel import Panel
+    from rich.table import Table as RichTable
+    from rich.text import Text
+
+    baseline = marker.metric.baseline or 0
+    direction = marker.metric.direction.value
+    budget = marker.loop.budget_per_experiment
+    max_exp = marker.loop.max_experiments
+
+    # Current stats from latest history entry
+    last = history[-1] if history else None
+    current_best = last.current_best if last else baseline
+    total_kept = last.kept if last else 0
+    total_disc = last.discarded if last else 0
+    total_crash = last.crashed if last else 0
+    completed = total_kept + total_disc + total_crash
+
+    # Header
+    header = Text()
+    header.append(f"Baseline: {baseline}", style="dim")
+    header.append(" → ", style="dim")
+    header.append(f"Current: {current_best}", style="bold green" if current_best != baseline else "bold")
+    header.append(f" ({direction})", style="dim")
+    header.append(f"  ◼  Budget: {budget}/experiment", style="dim")
+
+    # Progress bar
+    filled = int((completed / max_exp) * 30) if max_exp > 0 else 0
+    bar = "▓" * filled + "░" * (30 - filled)
+    progress_line = Text()
+    progress_line.append(f"{bar} ", style="cyan")
+    progress_line.append(f"{completed}/{max_exp}", style="bold")
+    progress_line.append("  Kept: ", style="dim")
+    progress_line.append(str(total_kept), style="bold green")
+    progress_line.append("  Disc: ", style="dim")
+    progress_line.append(str(total_disc), style="bold yellow")
+    progress_line.append("  Crash: ", style="dim")
+    progress_line.append(str(total_crash), style="bold red")
+
+    # Experiment table
+    table = RichTable(show_header=True, header_style="bold", box=None, padding=(0, 1))
+    table.add_column("#", style="dim", width=3, justify="right")
+    table.add_column("Status", width=8)
+    table.add_column("Metric", width=7, justify="right")
+    table.add_column("Delta", width=7, justify="right")
+    table.add_column("Description", no_wrap=True, max_width=50)
+
+    prev_best = baseline
+    for p in history:
+        if p.status == "running":
+            table.add_row(
+                str(p.exp_num),
+                "[cyan]⠋ running[/cyan]",
+                "...",
+                "",
+                "",
+            )
+        else:
+            status_style = {"keep": "bold green", "discard": "yellow", "crash": "red"}.get(p.status, "")
+            metric_str = str(int(p.metric)) if p.metric is not None else "--"
+            delta = ""
+            if p.metric is not None and prev_best is not None:
+                d = p.metric - prev_best
+                sign = "+" if d > 0 else ""
+                delta = f"{sign}{int(d)}"
+            desc = (p.description or "")[:50]
+            table.add_row(
+                str(p.exp_num),
+                f"[{status_style}]{p.status.upper()}[/{status_style}]",
+                metric_str,
+                delta,
+                desc,
+            )
+            if p.status == "keep" and p.metric is not None:
+                prev_best = p.metric
+
+    # Assemble
+    from rich.console import Group
+    content = Group(header, Text(""), progress_line, Text(""), table)
+    return Panel(content, title=f"[bold]autoresearch ◼ {marker_id}[/bold]", border_style="cyan")
+
+
+def _run_with_live_display(t, m, state, agent_runner):
+    """Run engine with Rich Live progress panel."""
+    from rich.live import Live
+
+    from autoresearch.engine import ExperimentProgress
+    from autoresearch.engine import run_marker as engine_run
+
+    history: list[ExperimentProgress] = []
+
+    live = Live(
+        _build_progress_panel(t.id, m, history),
+        console=console,
+        refresh_per_second=4,
+    )
+
+    def on_experiment(progress: ExperimentProgress):
+        # Replace "running" entry with actual result, or add new running entry
+        if history and history[-1].status == "running":
+            if progress.status != "running":
+                history[-1] = progress
+            # If new running for same exp, skip
+            return
+        history.append(progress)
+        live.update(_build_progress_panel(t.id, m, history))
+
+    with live:
+        result = engine_run(
+            repo_path=Path(t.repo_path),
+            marker=m,
+            state=state,
+            tracked=t,
+            agent_runner=agent_runner,
+            on_experiment=on_experiment,
+        )
+    return result
+
+
 def _execute_marker_run(t, state, repo: Optional[str], model: Optional[str], auto_merge: Optional[bool]) -> dict:
     """Run a single tracked marker through the engine. Returns a result dict."""
     from autoresearch.engine import EngineError, get_agent_runner, run_marker as engine_run
@@ -609,16 +729,7 @@ def _execute_marker_run(t, state, repo: Optional[str], model: Optional[str], aut
         import sys
         interactive = sys.stdout.isatty()
         if interactive:
-            console.print(f"[bold]Running {t.id}[/bold] — {m.loop.max_experiments} experiments, {m.loop.budget_per_experiment} budget each")
-            console.print(f"[dim]Metric: {m.metric.command[:60]}... | Direction: {m.metric.direction.value}[/dim]")
-            with console.status(f"[bold cyan]Running experiments...[/bold cyan]", spinner="dots"):
-                run_result = engine_run(
-                    repo_path=Path(t.repo_path),
-                    marker=m,
-                    state=state,
-                    tracked=t,
-                    agent_runner=agent_runner,
-                )
+            run_result = _run_with_live_display(t, m, state, agent_runner)
         else:
             run_result = engine_run(
                 repo_path=Path(t.repo_path),
