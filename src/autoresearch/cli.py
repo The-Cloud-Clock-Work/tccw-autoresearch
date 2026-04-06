@@ -606,13 +606,27 @@ def _execute_marker_run(t, state, repo: Optional[str], model: Optional[str], aut
 
     try:
         agent_runner = get_agent_runner(m)
-        run_result = engine_run(
-            repo_path=Path(t.repo_path),
-            marker=m,
-            state=state,
-            tracked=t,
-            agent_runner=agent_runner,
-        )
+        import sys
+        interactive = sys.stdout.isatty()
+        if interactive:
+            console.print(f"[bold]Running {t.id}[/bold] — {m.loop.max_experiments} experiments, {m.loop.budget_per_experiment} budget each")
+            console.print(f"[dim]Metric: {m.metric.command[:60]}... | Direction: {m.metric.direction.value}[/dim]")
+            with console.status(f"[bold cyan]Running experiments...[/bold cyan]", spinner="dots"):
+                run_result = engine_run(
+                    repo_path=Path(t.repo_path),
+                    marker=m,
+                    state=state,
+                    tracked=t,
+                    agent_runner=agent_runner,
+                )
+        else:
+            run_result = engine_run(
+                repo_path=Path(t.repo_path),
+                marker=m,
+                state=state,
+                tracked=t,
+                agent_runner=agent_runner,
+            )
         return {
             "marker": run_result.marker_name,
             "experiments": run_result.experiments,
