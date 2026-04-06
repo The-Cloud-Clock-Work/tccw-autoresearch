@@ -500,11 +500,7 @@ def run_marker(
 
         update_state(_apply_run_results, state_path)
 
-        if cleanup_worktree:
-            try:
-                remove_worktree(repo_path, wt_info.path)
-            except GitError:
-                logger.warning(f"Failed to cleanup worktree at {wt_info.path}")
+        # Worktree cleanup deferred — happens after publish attempt below
 
     # Compute final confidence
     final_kept = get_kept_metrics(results)
@@ -523,12 +519,25 @@ def run_marker(
         worktree_path=str(wt_info.path),
     )
 
-    # Post-run: push branch + create PRs for audit trail (always, when kept > 0)
+    # Post-run: push branch + create PR (when kept > 0)
+    publish_ok = False
     if result.kept > 0:
         try:
             _publish_results(repo_path, marker, result, wt_info.branch, results)
+            publish_ok = result.auto_merged or result.merge_target is not None
         except Exception:
             logger.exception("Failed to publish results")
+
+    # Cleanup worktree: remove if no kept experiments or if publish succeeded
+    if cleanup_worktree:
+        if result.kept == 0 or publish_ok:
+            try:
+                remove_worktree(repo_path, wt_info.path)
+            except GitError:
+                logger.warning(f"Failed to cleanup worktree at {wt_info.path}")
+        else:
+            console_msg = f"Worktree preserved: {wt_info.path} (branch: {wt_info.branch})"
+            logger.info(console_msg)
 
     return result
 

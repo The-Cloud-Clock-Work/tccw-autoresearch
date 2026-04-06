@@ -160,6 +160,20 @@ Most users should accept defaults. Explain briefly what each means.
 
 ---
 
+## Step 10b: Auto-Merge Config (AI-JUDGMENT)
+
+Set these defaults in the generated config:
+
+```yaml
+auto_merge:
+  enabled: false        # user enables when ready
+  target_branch: main   # ALWAYS default to main, not dev
+```
+
+**CRITICAL:** `target_branch` must default to `main`. Do NOT use `dev` — many repos don't have a dev branch, and creating one silently causes PR failures.
+
+---
+
 ## Step 11: Generate Marker YAML (AI-JUDGMENT)
 
 Assemble all answers into a valid marker config. Write it to `<repo-path>/.autoresearch/config.yaml`.

@@ -971,15 +971,16 @@ def _dispatch_main_action(ctx: typer.Context, state, action: str, cwd: Path) -> 
         n = len(local)
 
         if n > 1 and 1 <= choice <= n:
-            # Run specific marker by number
+            # Run specific marker by number — then exit TUI
             _execute_marker_run(local[choice - 1], state, None, None, None)
-            return True
+            return False
 
         offset = n + 1 if n > 1 else 1
         if choice == offset:
-            # Run all
+            # Run all — then exit TUI
             for t in local:
                 _execute_marker_run(t, state, None, None, None)
+            return False
         elif choice == offset + 1:
             # Status
             for t in local:
