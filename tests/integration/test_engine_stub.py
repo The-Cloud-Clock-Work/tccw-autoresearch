@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from autoresearch.engine import ClaudeCodeRunner, get_agent_runner, run_marker
+from autoresearch.engine import get_agent_runner, run_marker
 from autoresearch.marker import load_markers
 from autoresearch.state import AppState, TrackedMarker
 

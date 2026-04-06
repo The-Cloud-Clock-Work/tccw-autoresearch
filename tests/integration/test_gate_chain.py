@@ -1,10 +1,9 @@
 """Integration Test 4: Gate chain with real shell commands."""
 
 from dataclasses import dataclass
-from pathlib import Path
 from unittest.mock import MagicMock
 
-from autoresearch.gates import run_gate_chain, gate_security, gate_tests
+from autoresearch.gates import run_gate_chain
 
 
 @dataclass

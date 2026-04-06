@@ -1,6 +1,5 @@
 """Integration Test 3: Full worktree create → edit → commit → reset → cleanup."""
 
-import subprocess
 
 from autoresearch.worktree import (
     create_worktree,
