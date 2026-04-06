@@ -42,6 +42,14 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/autoresearch"]
 
+[tool.hatch.build.targets.sdist]
+include = ["src/autoresearch"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/autoresearch/.claude" = "autoresearch/.claude"
+"src/autoresearch/agents" = "autoresearch/agents"
+"src/autoresearch/skills" = "autoresearch/skills"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

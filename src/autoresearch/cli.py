@@ -384,9 +384,9 @@ def init_cmd(
         console.print("[dim]Install Claude Code (https://docs.anthropic.com/en/docs/claude-code) for the interactive onboard wizard.[/dim]")
         return
 
-    # claude_home has .claude/skills/ with onboard + autoresearch skills
-    claude_home = Path(__file__).parent / "claude_home"
-    if not (claude_home / ".claude" / "skills").exists():
+    # Package root has .claude/skills/ — Claude discovers /onboard from CWD
+    package_root = Path(__file__).parent
+    if not (package_root / ".claude" / "skills").exists():
         console.print("[yellow]Skills directory not found in package — falling back to scaffold-only mode.[/yellow]")
         return
 
@@ -401,7 +401,7 @@ def init_cmd(
         "--add-dir", str(repo_path),
         f"/onboard {repo_path}",
     ]
-    subprocess.run(cmd, cwd=str(claude_home))
+    subprocess.run(cmd, cwd=str(package_root))
 
 
 CONFIG_TEMPLATE = """\
