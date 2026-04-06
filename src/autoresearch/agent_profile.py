@@ -282,6 +282,18 @@ def ensure_agent_dir(
     logs_dir = agent_dir / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
 
+    # Ensure .gitignore exists to prevent committing runtime artifacts
+    gitignore_path = worktree_path / AUTORESEARCH_DIR / ".gitignore"
+    if not gitignore_path.exists():
+        gitignore_path.write_text(
+            "# Autoresearch runtime artifacts — do not commit\n"
+            "state.json\n"
+            "*/logs/\n"
+            "*/run.log\n"
+            "*/ideas.md\n"
+            "*/results.tsv\n"
+        )
+
     settings = generate_settings(marker, worktree_path)
     settings_path = agent_dir / "settings.json"
     settings_path.write_text(json.dumps(settings, indent=2))
