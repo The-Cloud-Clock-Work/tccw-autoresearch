@@ -4275,7 +4275,7 @@ class TestStatusMenuInteractiveActions:
             _interactive_main(ctx)
         mock_detach.assert_called_once()
 
-    def test_action_r_calls_run_selected(self):
+    def test_action_r_calls_run(self):
         from autoresearch.cli import _interactive_main
 
         tracked = _make_tracked()
@@ -4285,13 +4285,14 @@ class TestStatusMenuInteractiveActions:
             patch("autoresearch.cli._load_state", return_value=state),
             patch("autoresearch.cli.find_marker_file", return_value=None),
             patch("autoresearch.cli._home_mode"),
+            patch("autoresearch.cli._load_local_markers", return_value=[tracked]),
             patch("rich.prompt.Prompt.ask", side_effect=["r", "q"]),
-            patch("autoresearch.cli._action_run_selected_interactive") as mock_run,
+            patch("autoresearch.cli._execute_marker_run") as mock_run,
         ):
             _interactive_main(ctx)
         mock_run.assert_called_once()
 
-    def test_action_R_calls_run_repo(self):
+    def test_action_s_shows_status(self):
         from autoresearch.cli import _interactive_main
 
         tracked = _make_tracked()
@@ -4301,11 +4302,11 @@ class TestStatusMenuInteractiveActions:
             patch("autoresearch.cli._load_state", return_value=state),
             patch("autoresearch.cli.find_marker_file", return_value=None),
             patch("autoresearch.cli._home_mode"),
-            patch("rich.prompt.Prompt.ask", side_effect=["R", "q"]),
-            patch("autoresearch.cli._action_run_repo_interactive") as mock_run_repo,
+            patch("autoresearch.cli._load_local_markers", return_value=[tracked]),
+            patch("autoresearch.cli._resolve_marker_data", return_value=(None, None, None)),
+            patch("rich.prompt.Prompt.ask", side_effect=["s", "q"]),
         ):
             _interactive_main(ctx)
-        mock_run_repo.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

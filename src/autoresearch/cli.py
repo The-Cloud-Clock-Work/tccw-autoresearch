@@ -924,12 +924,19 @@ def merge_cmd(
 
 def _build_main_menu(state) -> tuple[list[str], str]:
     """Return (choices, prompt_text) for the main interactive menu."""
+    has_local = bool(find_marker_file(Path.cwd()))
+    if has_local:
+        local = _load_local_markers()
+        n = len(local)
+        if n == 1:
+            return ["r", "s", "i", "q"], "[r] Run  [s] Status  [i] Init/reconfigure  [q] Quit"
+        choices = [str(i) for i in range(1, n + 1)] + ["r", "s", "i", "q"]
+        return choices, f"[1-{n}] Select  [r] Run all  [s] Status  [i] Init  [q] Quit"
     if not state.markers:
-        return ["a", "p", "q"], "[a] Add from CWD  [p] Add by path  [q] Quit"
+        return ["i", "q"], "[i] Init (set up autoresearch here)  [q] Quit"
     n = len(state.markers)
-    choices = [str(i) for i in range(1, n + 1)] + ["a", "p", "d", "r", "R", "q"]
-    prompt_text = f"[1-{n}] Select  [a] Add  [p] Path  [d] Detach  [r] Run  [R] Run repo  [q] Quit"
-    return choices, prompt_text
+    choices = [str(i) for i in range(1, n + 1)] + ["r", "q"]
+    return choices, f"[1-{n}] Select  [r] Run  [q] Quit"
 
 
 def _dispatch_main_action(ctx: typer.Context, state, action: str, cwd: Path) -> bool:
@@ -938,20 +945,40 @@ def _dispatch_main_action(ctx: typer.Context, state, action: str, cwd: Path) -> 
 
     if action == "q":
         return False
-    if action == "a":
+    if action == "i":
+        # Run init on CWD
+        from autoresearch.agent_profile import init_autoresearch_dir
+        init_autoresearch_dir(cwd)
+        console.print(f"[green]Initialized .autoresearch/ in {cwd}[/green]")
+    elif action == "r":
+        # Run all active markers in CWD
+        local = _load_local_markers()
+        if local:
+            for t in local:
+                _execute_marker_run(t, state, None, None, None)
+        else:
+            console.print("[red]No markers found in current directory.[/red]")
+    elif action == "s":
+        # Show status for local markers
+        local = _load_local_markers()
+        for t in local:
+            _mf, m, eff = _resolve_marker_data(t)
+            if m:
+                console.print(f"  {t.id}: {eff.value if eff else 'unknown'}")
+    elif action == "a":
         _action_add(ctx, cwd)
     elif action == "p":
         path_str = Prompt.ask("Repo path")
         _action_add(ctx, Path(path_str))
     elif action == "d":
         _action_detach_interactive(ctx, state)
-    elif action == "r":
-        _action_run_selected_interactive(ctx, state)
-    elif action == "R":
-        _action_run_repo_interactive(ctx, state)
     elif action.isdigit():
+        local = _load_local_markers()
         idx = int(action) - 1
-        if 0 <= idx < len(state.markers):
+        if local and 0 <= idx < len(local):
+            # Run selected local marker
+            _execute_marker_run(local[idx], state, None, None, None)
+        elif 0 <= idx < len(state.markers):
             _marker_submenu(ctx, state.markers[idx])
     return True
 
@@ -995,36 +1022,30 @@ def _home_mode(ctx: typer.Context, state):
 
 
 def _repo_mode(ctx: typer.Context, state, cwd: Path, marker_file_path: Path):
-    """Display repo-specific view, offer to register untracked markers."""
-    from rich.prompt import Prompt
-
+    """Display repo-specific view — loads directly from config, no registration needed."""
     try:
         mf = load_markers(marker_file_path)
     except Exception as e:
         console.print(f"[red]Error reading {marker_file_path}: {e}[/red]")
         return
 
-    tracked_names = {t.marker_name for t in state.markers if Path(t.repo_path) == cwd}
-    untracked = [m for m in mf.markers if m.name not in tracked_names]
-
-    if untracked:
-        console.print(f"\n[bold]Found {len(untracked)} untracked marker(s) in {cwd.name}:[/bold]")
-        for m in untracked:
-            console.print(f"  - {m.name}")
-        if Prompt.ask("Register them?", choices=["y", "n"], default="y") == "y":
-            for m in untracked:
-                track_marker(state, cwd, m)
-            save_state(state)
-            console.print("[green]Registered.[/green]")
-
-    # Show repo markers as table
-    markers_data = []
-    for tracked in state.markers:
-        if Path(tracked.repo_path) == cwd:
-            _mf, marker, eff = _resolve_marker_data(tracked)
-            markers_data.append(_format_tracked_json(tracked, marker, eff))
-    if markers_data:
-        _render_marker_table(markers_data)
+    console.print(f"\n[bold]{cwd.name}[/bold] — {len(mf.markers)} marker(s)")
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("#", width=3, justify="right")
+    table.add_column("Marker")
+    table.add_column("Status")
+    table.add_column("Direction")
+    table.add_column("Metric Command", max_width=40)
+    for i, m in enumerate(mf.markers, 1):
+        status_style = "green" if m.status.value == "active" else "yellow"
+        table.add_row(
+            str(i),
+            m.name,
+            f"[{status_style}]{m.status.value}[/{status_style}]",
+            m.metric.direction.value,
+            m.metric.command[:40],
+        )
+    console.print(table)
 
 
 def _action_add(ctx: typer.Context, repo_path: Path):
