@@ -925,61 +925,88 @@ def merge_cmd(
 def _build_main_menu(state) -> tuple[list[str], str]:
     """Return (choices, prompt_text) for the main interactive menu."""
     has_local = bool(find_marker_file(Path.cwd()))
+    options = []
     if has_local:
         local = _load_local_markers()
         n = len(local)
-        if n == 1:
-            return ["r", "s", "i", "q"], "[r] Run  [s] Status  [i] Init/reconfigure  [q] Quit"
-        choices = [str(i) for i in range(1, n + 1)] + ["r", "s", "i", "q"]
-        return choices, f"[1-{n}] Select  [r] Run all  [s] Status  [i] Init  [q] Quit"
+        console.print()
+        if n > 1:
+            console.print("[bold]Select a marker or an action:[/bold]")
+            for i, t in enumerate(local, 1):
+                console.print(f"  [cyan]{i}[/cyan]  Run marker: [bold]{t.marker_name}[/bold]")
+            options = [str(i) for i in range(1, n + 1)]
+            offset = n + 1
+        else:
+            offset = 1
+        console.print(f"  [green]{offset}[/green]  Run {'all markers' if n > 1 else local[0].marker_name}")
+        console.print(f"  [yellow]{offset + 1}[/yellow]  Status")
+        console.print(f"  [blue]{offset + 2}[/blue]  Init / reconfigure")
+        console.print(f"  [dim]{offset + 3}[/dim]  Quit")
+        options += [str(offset), str(offset + 1), str(offset + 2), str(offset + 3)]
+        return options, "Select"
     if not state.markers:
-        return ["i", "q"], "[i] Init (set up autoresearch here)  [q] Quit"
+        console.print()
+        console.print("  [green]1[/green]  Init (set up autoresearch here)")
+        console.print("  [dim]2[/dim]  Quit")
+        return ["1", "2"], "Select"
     n = len(state.markers)
-    choices = [str(i) for i in range(1, n + 1)] + ["r", "q"]
-    return choices, f"[1-{n}] Select  [r] Run  [q] Quit"
+    console.print()
+    for i, t in enumerate(state.markers, 1):
+        console.print(f"  [cyan]{i}[/cyan]  {t.id}")
+    console.print(f"  [dim]{n + 1}[/dim]  Quit")
+    options = [str(i) for i in range(1, n + 2)]
+    return options, "Select"
 
 
 def _dispatch_main_action(ctx: typer.Context, state, action: str, cwd: Path) -> bool:
-    """Handle a main-menu action. Returns False to quit, True to continue."""
-    from rich.prompt import Prompt
+    """Handle a numbered menu action. Returns False to quit, True to continue."""
+    if not action.isdigit():
+        return True
 
-    if action == "q":
-        return False
-    if action == "i":
-        # Run init on CWD
-        from autoresearch.agent_profile import init_autoresearch_dir
-        init_autoresearch_dir(cwd)
-        console.print(f"[green]Initialized .autoresearch/ in {cwd}[/green]")
-    elif action == "r":
-        # Run all active markers in CWD
+    choice = int(action)
+    has_local = bool(find_marker_file(cwd))
+
+    if has_local:
         local = _load_local_markers()
-        if local:
+        n = len(local)
+
+        if n > 1 and 1 <= choice <= n:
+            # Run specific marker by number
+            _execute_marker_run(local[choice - 1], state, None, None, None)
+            return True
+
+        offset = n + 1 if n > 1 else 1
+        if choice == offset:
+            # Run all
             for t in local:
                 _execute_marker_run(t, state, None, None, None)
+        elif choice == offset + 1:
+            # Status
+            for t in local:
+                _mf, m, eff = _resolve_marker_data(t)
+                if m:
+                    console.print(f"  {t.id}: {eff.value if eff else 'unknown'}")
+        elif choice == offset + 2:
+            # Init / reconfigure
+            from autoresearch.agent_profile import init_autoresearch_dir
+            init_autoresearch_dir(cwd)
+            console.print(f"[green]Initialized .autoresearch/ in {cwd}[/green]")
+        elif choice == offset + 3:
+            return False
+    else:
+        if not state.markers:
+            if choice == 1:
+                from autoresearch.agent_profile import init_autoresearch_dir
+                init_autoresearch_dir(cwd)
+                console.print(f"[green]Initialized .autoresearch/ in {cwd}[/green]")
+            elif choice == 2:
+                return False
         else:
-            console.print("[red]No markers found in current directory.[/red]")
-    elif action == "s":
-        # Show status for local markers
-        local = _load_local_markers()
-        for t in local:
-            _mf, m, eff = _resolve_marker_data(t)
-            if m:
-                console.print(f"  {t.id}: {eff.value if eff else 'unknown'}")
-    elif action == "a":
-        _action_add(ctx, cwd)
-    elif action == "p":
-        path_str = Prompt.ask("Repo path")
-        _action_add(ctx, Path(path_str))
-    elif action == "d":
-        _action_detach_interactive(ctx, state)
-    elif action.isdigit():
-        local = _load_local_markers()
-        idx = int(action) - 1
-        if local and 0 <= idx < len(local):
-            # Run selected local marker
-            _execute_marker_run(local[idx], state, None, None, None)
-        elif 0 <= idx < len(state.markers):
-            _marker_submenu(ctx, state.markers[idx])
+            n = len(state.markers)
+            if 1 <= choice <= n:
+                _marker_submenu(ctx, state.markers[choice - 1])
+            elif choice == n + 1:
+                return False
     return True
 
 

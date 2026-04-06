@@ -505,7 +505,7 @@ class TestInteractiveMode:
             patch("autoresearch.cli.load_state", return_value=AppState()),
             patch("autoresearch.cli.find_marker_file", return_value=None),
         ):
-            result = runner.invoke(app, [], input="q\n")
+            result = runner.invoke(app, [], input="2\n")
         assert result.exit_code == 0
 
     def test_shows_no_markers_message(self):
@@ -513,7 +513,7 @@ class TestInteractiveMode:
             patch("autoresearch.cli.load_state", return_value=AppState()),
             patch("autoresearch.cli.find_marker_file", return_value=None),
         ):
-            result = runner.invoke(app, [], input="q\n")
+            result = runner.invoke(app, [], input="2\n")
         assert "No markers tracked" in result.output
 
     def test_shows_marker_table(self):
@@ -549,8 +549,8 @@ class TestInteractiveMode:
             patch("autoresearch.cli.load_markers", return_value=mf),
             patch("autoresearch.cli.get_effective_status", return_value=MarkerStatus.ACTIVE),
         ):
-            # Select marker 1, then quit submenu, then quit main
-            result = runner.invoke(app, [], input="1\nq\nq\n")
+            # Select marker 1, then quit submenu, then quit main (quit = n+1 = 2)
+            result = runner.invoke(app, [], input="1\nq\n2\n")
 
         assert result.exit_code == 0
 
@@ -4226,7 +4226,8 @@ class TestStatusMenuInteractiveActions:
         ctx.obj = {"headless": False}
         return ctx
 
-    def test_action_a_calls_action_add(self):
+    def test_init_action_no_local_config(self):
+        """With no local config and no markers, option 1 = init, 2 = quit."""
         from autoresearch.cli import _interactive_main
 
         state = AppState(markers=[])
@@ -4235,76 +4236,46 @@ class TestStatusMenuInteractiveActions:
             patch("autoresearch.cli._load_state", return_value=state),
             patch("autoresearch.cli.find_marker_file", return_value=None),
             patch("autoresearch.cli._home_mode"),
-            patch("rich.prompt.Prompt.ask", side_effect=["a", "q"]),
-            patch("autoresearch.cli._action_add") as mock_add,
+            patch("rich.prompt.Prompt.ask", side_effect=["1", "2"]),
+            patch("autoresearch.agent_profile.init_autoresearch_dir") as mock_init,
         ):
             _interactive_main(ctx)
-        mock_add.assert_called_once()
+        mock_init.assert_called_once()
 
-    def test_action_p_prompts_for_path(self):
+    def test_run_action_with_local_config(self):
+        """With local config (1 marker), option 1 = run, 4 = quit."""
         from autoresearch.cli import _interactive_main
 
+        tracked = _make_tracked()
         state = AppState(markers=[])
         ctx = self._make_ctx()
-        ask_calls = iter(["p", "/some/path", "q"])
+        marker_file_path = Path("/tmp/fakerepo/.autoresearch/config.yaml")
         with (
             patch("autoresearch.cli._load_state", return_value=state),
-            patch("autoresearch.cli.find_marker_file", return_value=None),
-            patch("autoresearch.cli._home_mode"),
-            patch("rich.prompt.Prompt.ask", side_effect=ask_calls),
-            patch("autoresearch.cli._action_add") as mock_add,
-        ):
-            _interactive_main(ctx)
-        assert mock_add.call_count == 1
-        call_path = mock_add.call_args[0][1]
-        assert str(call_path) == "/some/path"
-
-    def test_action_d_calls_detach(self):
-        from autoresearch.cli import _interactive_main
-
-        tracked = _make_tracked()
-        state = AppState(markers=[tracked])
-        ctx = self._make_ctx()
-        with (
-            patch("autoresearch.cli._load_state", return_value=state),
-            patch("autoresearch.cli.find_marker_file", return_value=None),
-            patch("autoresearch.cli._home_mode"),
-            patch("rich.prompt.Prompt.ask", side_effect=["d", "q"]),
-            patch("autoresearch.cli._action_detach_interactive") as mock_detach,
-        ):
-            _interactive_main(ctx)
-        mock_detach.assert_called_once()
-
-    def test_action_r_calls_run(self):
-        from autoresearch.cli import _interactive_main
-
-        tracked = _make_tracked()
-        state = AppState(markers=[tracked])
-        ctx = self._make_ctx()
-        with (
-            patch("autoresearch.cli._load_state", return_value=state),
-            patch("autoresearch.cli.find_marker_file", return_value=None),
-            patch("autoresearch.cli._home_mode"),
+            patch("autoresearch.cli.find_marker_file", return_value=marker_file_path),
+            patch("autoresearch.cli._repo_mode"),
             patch("autoresearch.cli._load_local_markers", return_value=[tracked]),
-            patch("rich.prompt.Prompt.ask", side_effect=["r", "q"]),
+            patch("rich.prompt.Prompt.ask", side_effect=["1", "4"]),
             patch("autoresearch.cli._execute_marker_run") as mock_run,
         ):
             _interactive_main(ctx)
         mock_run.assert_called_once()
 
-    def test_action_s_shows_status(self):
+    def test_status_action_with_local_config(self):
+        """With local config (1 marker), option 2 = status, 4 = quit."""
         from autoresearch.cli import _interactive_main
 
         tracked = _make_tracked()
-        state = AppState(markers=[tracked])
+        state = AppState(markers=[])
         ctx = self._make_ctx()
+        marker_file_path = Path("/tmp/fakerepo/.autoresearch/config.yaml")
         with (
             patch("autoresearch.cli._load_state", return_value=state),
-            patch("autoresearch.cli.find_marker_file", return_value=None),
-            patch("autoresearch.cli._home_mode"),
+            patch("autoresearch.cli.find_marker_file", return_value=marker_file_path),
+            patch("autoresearch.cli._repo_mode"),
             patch("autoresearch.cli._load_local_markers", return_value=[tracked]),
             patch("autoresearch.cli._resolve_marker_data", return_value=(None, None, None)),
-            patch("rich.prompt.Prompt.ask", side_effect=["s", "q"]),
+            patch("rich.prompt.Prompt.ask", side_effect=["2", "4"]),
         ):
             _interactive_main(ctx)
 
