@@ -437,7 +437,7 @@ markers:
       disallowed_tools: []
     auto_merge:
       enabled: false
-      target_branch: dev
+      target_branch: main
     schedule:
       type: on-demand
 """
