@@ -94,6 +94,10 @@ flowchart TD
 
 Reduce lint errors. Increase test coverage. Cut build times. Fix code smells. Anything you can measure with a shell command.
 
+### `autoresearch init` in action
+
+![AutoResearch onboard wizard — Claude scans your project, checks prerequisites, and configures everything](docs/images/onboard-wizard.png)
+
 ---
 
 ## What Is This?

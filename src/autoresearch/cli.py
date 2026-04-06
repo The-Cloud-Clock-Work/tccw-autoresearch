@@ -399,7 +399,7 @@ def init_cmd(
         "claude",
         "--model", model,
         "--add-dir", str(repo_path),
-        f"/onboard {repo_path}",
+        "--", f"/onboard {repo_path}",
     ]
     subprocess.run(cmd, cwd=str(package_root))
 
