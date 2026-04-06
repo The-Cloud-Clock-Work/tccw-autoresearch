@@ -104,6 +104,10 @@ Reduce lint errors. Increase test coverage. Cut build times. Fix code smells. An
 
 ![Generated config.yaml — complete marker with metric, guard, loop, agent, and schedule](docs/images/onboard-config.png)
 
+### `autoresearch run` — live experiment progress
+
+![CLI progress panel — live-updating experiment table with kept/discarded/crashed status and metric deltas](docs/images/cli-progress.png)
+
 ---
 
 ## What Is This?
