@@ -165,6 +165,15 @@ class EscalationState:
             self.escalation_level = "normal"
 
 
+def _load_dotenv_into(env: dict[str, str], path: Path) -> None:
+    """Parse a .env file and merge into env dict."""
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            key, _, value = line.partition("=")
+            env[key.strip()] = value.strip()
+
+
 class ClaudeCodeRunner(AgentRunner):
     """Agent runner using Claude Code CLI with profile-based permissions."""
 
@@ -192,7 +201,7 @@ class ClaudeCodeRunner(AgentRunner):
         timeout_seconds = _parse_budget(budget)
 
         cmd = self._build_cmd(program, worktree_path, paths, DEFAULT_AGENT_DIR, build_cli_permission_flags)
-        env = self._build_env(paths, timeout_seconds)
+        env = self._build_env(paths, timeout_seconds, repo_path=worktree_path)
 
         logger.info(f"Agent cmd: {' '.join(cmd[:6])}...")
         logger.debug(f"Agent cwd: {paths.agent_dir}")
@@ -278,19 +287,34 @@ class ClaudeCodeRunner(AgentRunner):
         cmd.extend(self.agent_config.extra_flags)
         return cmd
 
-    def _build_env(self, paths, timeout_seconds: int) -> dict[str, str]:
-        """Build the environment dict for the agent subprocess."""
+    def _build_env(self, paths, timeout_seconds: int, repo_path: Path | None = None) -> dict[str, str]:
+        """Build the environment dict for the agent subprocess.
+
+        Layering (later wins):
+        1. os.environ (parent process)
+        2. paths.env (settings.json "env" block)
+        3. marker agent.env_file (project-wide .env)
+        4. agent_dir/.env (agent-specific)
+        5. AUTORESEARCH_BUDGET_END
+        """
         env = dict(os.environ)
         if paths.env:
             env.update(paths.env)
 
+        # Marker-level env_file (project-wide secrets)
+        if self.marker.agent.env_file:
+            env_file_path = Path(self.marker.agent.env_file)
+            if not env_file_path.is_absolute() and repo_path:
+                env_file_path = repo_path / env_file_path
+            if env_file_path.is_file():
+                _load_dotenv_into(env, env_file_path)
+            else:
+                logger.warning(f"env_file not found: {env_file_path}")
+
+        # Agent-dir .env (agent-specific overrides)
         dot_env = paths.agent_dir / ".env"
         if dot_env.is_file():
-            for line in dot_env.read_text().splitlines():
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    key, _, value = line.partition("=")
-                    env[key.strip()] = value.strip()
+            _load_dotenv_into(env, dot_env)
 
         env["AUTORESEARCH_BUDGET_END"] = str(int(time.time()) + timeout_seconds)
         return env

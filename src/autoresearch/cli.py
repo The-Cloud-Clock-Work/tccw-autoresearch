@@ -432,6 +432,7 @@ markers:
       permission_mode: bypassPermissions
       budget_per_experiment: 25m
       max_experiments: 10
+      env_file: null
       allowed_tools: []
       disallowed_tools: []
     auto_merge:

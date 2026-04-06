@@ -97,6 +97,7 @@ class AgentConfig(BaseModel):
     budget_per_experiment: str = "10m"
     max_experiments: int = 50
     max_cost: str | None = None
+    env_file: str | None = None
     allowed_tools: list[str] = []
     disallowed_tools: list[str] = []
     extra_flags: list[str] = []
