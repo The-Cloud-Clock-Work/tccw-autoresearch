@@ -23,6 +23,7 @@ from autoresearch.marker import (
     load_markers,
 )
 from autoresearch.state import (
+    TrackedMarker,
     get_effective_status,
     get_tracked,
     load_state,
@@ -566,6 +567,31 @@ def pause_cmd(
         console.print(f"[yellow]{marker}: {new_status}[/yellow]")
 
 
+def _load_local_markers(marker_name: str | None = None) -> list[TrackedMarker]:
+    """Load markers from CWD's .autoresearch/config.yaml without registration.
+
+    Synthesizes TrackedMarker objects on the fly from the local config.
+    If marker_name given, filter to that single marker.
+    """
+    config_path = Path.cwd() / ".autoresearch" / "config.yaml"
+    if not config_path.exists():
+        return []
+    marker_file = load_markers(config_path)
+    repo_path = Path.cwd()
+    repo_name = repo_path.name
+    results = []
+    for m in marker_file.markers:
+        if marker_name and m.name != marker_name:
+            continue
+        results.append(TrackedMarker(
+            id=f"{repo_name}:{m.name}",
+            repo_path=str(repo_path),
+            repo_name=repo_name,
+            marker_name=m.name,
+        ))
+    return results
+
+
 def _resolve_run_targets(ctx: typer.Context, state, marker: Optional[str], repo: Optional[str]) -> list:
     """Resolve the list of tracked markers to run, or raise typer.Exit on error."""
     if marker:
@@ -779,16 +805,29 @@ def run_cmd(
 ):
     """Run experiment loop for a marker or all markers in a repo."""
     _init_ctx(ctx)
-
-    if not marker and not repo:
-        if is_headless(ctx):
-            headless_output(ctx, err_json("Must specify --marker or --repo", 2))
-            raise typer.Exit(code=2)
-        console.print("[red]Must specify --marker or --repo[/red]")
-        raise typer.Exit(code=2)
-
     state = _load_state(ctx)
-    to_run = _resolve_run_targets(ctx, state, marker, repo)
+
+    # Smart resolution: CWD config first, no registration needed
+    if not marker and not repo:
+        to_run = _load_local_markers()
+        if not to_run:
+            msg = "No .autoresearch/config.yaml in current directory. Run `autoresearch init` first."
+            if is_headless(ctx):
+                headless_output(ctx, err_json(msg, 2))
+                raise typer.Exit(code=2)
+            console.print(f"[red]{msg}[/red]")
+            raise typer.Exit(code=2)
+    elif marker and ":" not in marker:
+        to_run = _load_local_markers(marker)
+        if not to_run:
+            msg = f"Marker '{marker}' not found in .autoresearch/config.yaml"
+            if is_headless(ctx):
+                headless_output(ctx, err_json(msg, 1))
+                raise typer.Exit(code=1)
+            console.print(f"[red]{msg}[/red]")
+            raise typer.Exit(code=1)
+    else:
+        to_run = _resolve_run_targets(ctx, state, marker, repo)
 
     results_list = []
     for t in to_run:

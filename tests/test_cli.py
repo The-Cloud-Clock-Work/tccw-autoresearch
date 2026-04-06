@@ -354,13 +354,14 @@ class TestHeadlessPause:
 
 
 class TestHeadlessRun:
-    def test_run_no_args(self):
-        result = runner.invoke(app, ["--headless", "run"])
+    def test_run_no_args_no_config(self):
+        with patch("autoresearch.cli._load_local_markers", return_value=[]):
+            result = runner.invoke(app, ["--headless", "run"])
         assert result.exit_code == 2
 
     def test_run_nonexistent_marker(self):
-        with patch("autoresearch.cli.load_state", return_value=AppState()):
-            result = runner.invoke(app, ["--headless", "run", "-m", "nope:nope"])
+        with patch("autoresearch.cli._load_local_markers", return_value=[]):
+            result = runner.invoke(app, ["--headless", "run", "-m", "nope"])
         assert result.exit_code == 1
 
     def test_run_marker_success(self):
@@ -963,13 +964,14 @@ class TestInteractivePause:
 
 
 class TestInteractiveRun:
-    def test_no_args_exits_2(self):
-        result = runner.invoke(app, ["run"])
+    def test_no_args_no_config_exits_2(self):
+        with patch("autoresearch.cli._load_local_markers", return_value=[]):
+            result = runner.invoke(app, ["run"])
         assert result.exit_code == 2
 
     def test_nonexistent_marker_exits_1(self):
-        with patch("autoresearch.cli.load_state", return_value=AppState()):
-            result = runner.invoke(app, ["run", "-m", "missing:marker"])
+        with patch("autoresearch.cli._load_local_markers", return_value=[]):
+            result = runner.invoke(app, ["run", "-m", "missing"])
         assert result.exit_code == 1
         assert "not found" in result.output.lower()
 
@@ -4048,17 +4050,15 @@ class TestDaemonLogsNoFile:
 # ---------------------------------------------------------------------------
 
 class TestRunCmdNoMarkerNoRepo:
-    def test_headless_no_marker_no_repo_exits_2(self):
-        state = AppState(markers=[])
-        with patch("autoresearch.cli._load_state", return_value=state):
+    def test_headless_no_marker_no_config_exits_2(self):
+        with patch("autoresearch.cli._load_local_markers", return_value=[]):
             result = runner.invoke(app, ["--headless", "run"])
         assert result.exit_code == 2
         data = json.loads(result.output)
         assert data["status"] == "error"
 
-    def test_non_headless_no_marker_no_repo_exits_2(self):
-        state = AppState(markers=[])
-        with patch("autoresearch.cli._load_state", return_value=state):
+    def test_non_headless_no_marker_no_config_exits_2(self):
+        with patch("autoresearch.cli._load_local_markers", return_value=[]):
             result = runner.invoke(app, ["run"])
         assert result.exit_code == 2
 
