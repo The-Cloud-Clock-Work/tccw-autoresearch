@@ -1,6 +1,6 @@
 [project]
 name = "tccw-autoresearch"
-version = "0.3.1"
+version = "0.3.2"
 description = "Agnostic autonomous improvement engine — point it at any codebase, it makes it measurably better overnight"
 authors = [{name = "The Cloud Clock Work"}]
 requires-python = ">=3.10"
