@@ -98,6 +98,8 @@ Reduce lint errors. Increase test coverage. Cut build times. Fix code smells. An
 
 ![AutoResearch onboard wizard — Claude scans your project, checks prerequisites, and configures everything](docs/images/onboard-wizard.png)
 
+![Claude asks which files the agent can edit — mutable vs immutable boundaries](docs/images/onboard-mutable.png)
+
 ---
 
 ## What Is This?
