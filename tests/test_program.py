@@ -1,8 +1,8 @@
 """Tests for program.py — program.md template generation."""
 
 from autoresearch.marker import (
+    AgentConfig,
     Escalation,
-    LoopConfig,
     Marker,
     MarkerStatus,
     Metric,
@@ -36,7 +36,7 @@ def _make_marker(**overrides) -> Marker:
             direction=MetricDirection.HIGHER,
             baseline=24,
         ),
-        "loop": LoopConfig(),
+        "agent": AgentConfig(),
         "escalation": Escalation(),
         "schedule": Schedule(),
         "results": ResultsConfig(),
@@ -94,7 +94,7 @@ class TestGenerateProgram:
         assert "Target:" not in result
 
     def test_budget_shown(self):
-        marker = _make_marker(loop=LoopConfig(budget_per_experiment="5m"))
+        marker = _make_marker(agent=AgentConfig(budget_per_experiment="5m"))
         result = generate_program(marker, None, "", "", "normal")
         assert "5m" in result
 

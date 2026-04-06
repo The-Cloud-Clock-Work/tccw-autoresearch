@@ -18,7 +18,7 @@ markers:
       extract: "grep -oP '\\d+(?= passed)'"
       threshold: 50
       rework_attempts: 2
-    loop:
+    agent:
       model: sonnet
       budget_per_experiment: 10m
       max_experiments: 50
@@ -47,7 +47,7 @@ markers:
       extract: "grep real | awk '{print $2}'"
       direction: lower
       baseline: 120
-    loop:
+    agent:
       model: haiku
       budget_per_experiment: 5m
       max_experiments: 30

@@ -14,7 +14,6 @@ from autoresearch.agent_profile import (
 )
 from autoresearch.marker import (
     AgentConfig,
-    LoopConfig,
     Marker,
     Metric,
     Target,
@@ -27,7 +26,7 @@ def _make_marker(**overrides) -> Marker:
         "description": "Test marker",
         "target": Target(mutable=["tests/test_main.py"], immutable=["src/main.py"]),
         "metric": Metric(command="echo 1", extract=r"\d+", direction="higher", baseline=1.0),
-        "loop": LoopConfig(model="sonnet", budget_per_experiment="10m", max_experiments=10),
+        "agent": AgentConfig(model="sonnet", budget_per_experiment="10m", max_experiments=10),
     }
     defaults.update(overrides)
     return Marker(**defaults)

@@ -150,7 +150,7 @@ Present the suggested metric to the user. Explain what the command does and what
 
 ## Step 10: Ask Loop Config (AI-JUDGMENT)
 
-Use AskUserQuestion for loop settings with sensible defaults:
+Use AskUserQuestion for agent settings with sensible defaults:
 
 - **Model**: sonnet (recommended), opus (more capable, higher cost), haiku (fast, cheaper)
 - **Budget per experiment**: 10m (default), 5m (quick), 25m (complex)

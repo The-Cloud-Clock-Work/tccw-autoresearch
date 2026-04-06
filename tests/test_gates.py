@@ -15,7 +15,7 @@ from autoresearch.gates import (
     gate_tests,
     run_gate_chain,
 )
-from autoresearch.marker import AutoMerge, Guard, LoopConfig, Marker, Metric, MetricDirection, Target
+from autoresearch.marker import AgentConfig, AutoMerge, Guard, Marker, Metric, MetricDirection, Target
 
 
 @dataclass
@@ -37,7 +37,7 @@ def _make_marker(**overrides) -> Marker:
         "name": "test",
         "target": Target(mutable=["src/**/*.py"]),
         "metric": Metric(command="echo 10", extract="cat", direction=MetricDirection.LOWER, baseline=20),
-        "loop": LoopConfig(model="sonnet", budget_per_experiment="5m", max_experiments=10),
+        "agent": AgentConfig(model="sonnet", budget_per_experiment="5m", max_experiments=10),
     }
     defaults.update(overrides)
     return Marker(**defaults)

@@ -62,7 +62,7 @@ def marker_config():
                     "direction": direction,
                     "baseline": baseline,
                 },
-                "loop": {
+                "agent": {
                     "model": "sonnet",
                     "budget_per_experiment": budget,
                     "max_experiments": 1,

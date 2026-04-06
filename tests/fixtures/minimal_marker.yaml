@@ -7,7 +7,7 @@ markers:
       extract: "grep -oP '\\d+(?= passed)'"
       direction: higher
       baseline: 10
-    loop:
+    agent:
       model: sonnet
       budget_per_experiment: 5m
       max_experiments: 20

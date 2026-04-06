@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from pathlib import Path
 import yaml
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel
 
 
 MARKER_FILENAME = ".autoresearch.yaml"
@@ -46,14 +46,6 @@ class Guard(BaseModel):
     threshold: float | None = None
     rework_attempts: int = 2
 
-
-class LoopConfig(BaseModel):
-    """Deprecated — fields moved to AgentConfig. Kept for backward compat."""
-
-    model: str = ""
-    budget_per_experiment: str = ""
-    max_experiments: int = 0
-    max_cost: str | None = None
 
 
 class Escalation(BaseModel):
@@ -110,25 +102,12 @@ class Marker(BaseModel):
     target: Target
     metric: Metric
     guard: Guard = Guard()
-    loop: LoopConfig = LoopConfig()
     escalation: Escalation = Escalation()
     schedule: Schedule = Schedule()
     results: ResultsConfig = ResultsConfig()
     agent: AgentConfig = AgentConfig()
     auto_merge: AutoMerge = AutoMerge()
 
-    @model_validator(mode="after")
-    def _migrate_loop_to_agent(self):
-        """Backward compat: if loop has values, copy them to agent."""
-        if self.loop.model and not self.agent.model:
-            self.agent.model = self.loop.model
-        if self.loop.budget_per_experiment:
-            self.agent.budget_per_experiment = self.loop.budget_per_experiment
-        if self.loop.max_experiments:
-            self.agent.max_experiments = self.loop.max_experiments
-        if self.loop.max_cost:
-            self.agent.max_cost = self.loop.max_cost
-        return self
 
 
 class MarkerFile(BaseModel):

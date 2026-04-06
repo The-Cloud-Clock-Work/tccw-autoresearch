@@ -25,7 +25,7 @@ Each marker contains these sections:
 | `target.immutable` | Harness files — NEVER touched by the engine |
 | `metric` | Command to run, extraction pattern, direction, baseline |
 | `guard` | Optional regression gate (dual-gate verification) |
-| `loop` | Model, budget, max experiments, cost limit |
+| `agent` | Model, budget, max experiments, env_file, allowed/disallowed tools |
 | `escalation` | Failure thresholds for refine/pivot/search/halt |
 | `schedule` | overnight, weekend, on-demand, or cron |
 | `auto_merge` | Gate chain, merge target, push/PR flags, lifecycle hooks |

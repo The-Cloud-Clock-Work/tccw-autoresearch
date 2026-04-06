@@ -39,8 +39,8 @@ class TestLoadMarkers:
         assert m.guard.command is not None
         assert m.guard.threshold == 50
         assert m.escalation.refine_after == 3
-        assert m.loop.model == "sonnet"
-        assert m.loop.max_experiments == 50
+        assert m.agent.model == "sonnet"
+        assert m.agent.max_experiments == 50
 
     def test_valid_marker_second_is_skip(self):
         mf = load_markers(FIXTURES / "valid_marker.yaml")
@@ -105,12 +105,11 @@ class TestResolveMarkerId:
 
 class TestMarkerDefaults:
     def test_marker_status_default_active(self):
-        from autoresearch.marker import Metric, MetricDirection, Target, LoopConfig
+        from autoresearch.marker import Metric, MetricDirection, Target
         m = Marker(
             name="test",
             target=Target(mutable=["src/foo.py"]),
             metric=Metric(command="pytest", extract="grep", direction=MetricDirection.HIGHER, baseline=0),
-            loop=LoopConfig(),
         )
         assert m.status == MarkerStatus.ACTIVE
         assert m.description == ""

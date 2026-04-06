@@ -42,7 +42,7 @@ markers:
       threshold: number | null      # Minimum acceptable value (below = guard fails)
       rework_attempts: integer      # Attempts to fix before discarding (default: 2)
 
-    loop:
+    agent:
       model: string                 # LLM model (e.g. "sonnet", "opus", "haiku")
       budget_per_experiment: string  # Time limit per experiment (e.g. "10m", "5m")
       max_experiments: integer      # Hard cap on total experiments

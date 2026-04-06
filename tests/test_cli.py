@@ -9,7 +9,7 @@ from unittest.mock import patch
 from typer.testing import CliRunner
 
 from autoresearch.cli import app
-from autoresearch.marker import Marker, MarkerFile, MarkerStatus, Metric, Target, LoopConfig
+from autoresearch.marker import AgentConfig, Marker, MarkerFile, MarkerStatus, Metric, Target
 from autoresearch.state import AppState, TrackedMarker, save_state
 
 runner = CliRunner()
@@ -22,7 +22,7 @@ def _make_marker(name: str = "test-marker", status: MarkerStatus = MarkerStatus.
         status=status,
         target=Target(mutable=["src/main.py"]),
         metric=Metric(command="echo 42", extract=r"\d+", direction="higher", baseline=10.0, target=50.0),
-        loop=LoopConfig(model="sonnet", budget_per_experiment="5m", max_experiments=10),
+        agent=AgentConfig(model="sonnet", budget_per_experiment="5m", max_experiments=10),
     )
 
 
@@ -244,7 +244,7 @@ class TestHeadlessAdd:
                 "name": "speed-test",
                 "target": {"mutable": ["main.py"]},
                 "metric": {"command": "echo 1", "extract": r"\d+", "direction": "higher", "baseline": 1.0},
-                "loop": {"model": "sonnet", "budget_per_experiment": "5m", "max_experiments": 10},
+                "agent": {"model": "sonnet", "budget_per_experiment": "5m", "max_experiments": 10},
             }]
         }
         (tmp_path / ".autoresearch.yaml").write_text(yaml.dump(marker_yaml))
@@ -3199,7 +3199,7 @@ class TestDaemonStatusHeadlessScheduled:
         assert data["data"]["pid"] == 12345
 
     def test_headless_status_scheduled_markers_listed(self, tmp_path):
-        from autoresearch.marker import Escalation, LoopConfig, Marker, MarkerFile, MarkerStatus, Metric, MetricDirection, ResultsConfig, Schedule, Target
+        from autoresearch.marker import Escalation, Marker, MarkerFile, MarkerStatus, Metric, MetricDirection, ResultsConfig, Schedule, Target
         from autoresearch.state import TrackedMarker
 
         tracked = TrackedMarker(
@@ -3217,7 +3217,6 @@ class TestDaemonStatusHeadlessScheduled:
             status=MarkerStatus.ACTIVE,
             target=Target(mutable=[], immutable=[]),
             metric=Metric(command="echo", extract="", direction=MetricDirection.HIGHER, baseline=0),
-            loop=LoopConfig(),
             escalation=Escalation(),
             schedule=Schedule(type="overnight"),
             results=ResultsConfig(),
@@ -3473,7 +3472,7 @@ class TestShowResultsInteractive:
 class TestRunCmdModelOverride:
     def test_model_override_applied(self, tmp_path):
         from unittest.mock import MagicMock
-        from autoresearch.marker import AgentConfig, Escalation, LoopConfig, Marker, MarkerStatus, Metric, MetricDirection, ResultsConfig, Schedule, Target
+        from autoresearch.marker import AgentConfig, Escalation, Marker, MarkerStatus, Metric, MetricDirection, ResultsConfig, Schedule, Target
         from autoresearch.state import TrackedMarker
 
         tracked = TrackedMarker(
@@ -3490,7 +3489,6 @@ class TestRunCmdModelOverride:
             status=MarkerStatus.ACTIVE,
             target=Target(mutable=[], immutable=[]),
             metric=Metric(command="echo", extract="", direction=MetricDirection.HIGHER, baseline=0),
-            loop=LoopConfig(),
             escalation=Escalation(),
             schedule=Schedule(),
             results=ResultsConfig(),

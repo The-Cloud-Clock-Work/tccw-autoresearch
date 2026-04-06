@@ -29,8 +29,8 @@ echo "Marker:   ${MARKER_NAME}"
 METRIC_CMD=$(grep -A5 'metric:' "$CONFIG" | grep 'command:' | head -1 | sed 's/.*command:\s*//' | tr -d '"')
 METRIC_DIR=$(grep -A5 'metric:' "$CONFIG" | grep 'direction:' | head -1 | sed 's/.*direction:\s*//' | tr -d '"')
 BASELINE=$(grep -A5 'metric:' "$CONFIG" | grep 'baseline:' | head -1 | sed 's/.*baseline:\s*//')
-BUDGET=$(grep -A3 'loop:' "$CONFIG" | grep 'budget_per_experiment:' | head -1 | sed 's/.*budget_per_experiment:\s*//')
-MAX_EXP=$(grep -A3 'loop:' "$CONFIG" | grep 'max_experiments:' | head -1 | sed 's/.*max_experiments:\s*//')
+BUDGET=$(grep -A10 'agent:' "$CONFIG" | grep 'budget_per_experiment:' | head -1 | sed 's/.*budget_per_experiment:\s*//')
+MAX_EXP=$(grep -A10 'agent:' "$CONFIG" | grep 'max_experiments:' | head -1 | sed 's/.*max_experiments:\s*//')
 AUTO_MERGE=$(grep -A3 'auto_merge:' "$CONFIG" | grep 'enabled:' | head -1 | sed 's/.*enabled:\s*//')
 TARGET_BR=$(grep -A3 'auto_merge:' "$CONFIG" | grep 'target_branch:' | head -1 | sed 's/.*target_branch:\s*//')
 

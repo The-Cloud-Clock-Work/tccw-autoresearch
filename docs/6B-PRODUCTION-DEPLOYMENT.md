@@ -44,7 +44,7 @@ markers:
     guard:
       command: "ruff check . 2>&1 | grep -qP 'Found \\d+'"
       rework_attempts: 1
-    loop:
+    agent:
       model: claude-sonnet-4-6  # sonnet for cost efficiency
       budget_per_experiment: 20m
       max_experiments: 1        # start with 1, increase when stable
@@ -130,7 +130,7 @@ ruff check . 2>&1 | grep -oP 'Found \K\d+'
 ### More experiments per run
 
 ```yaml
-loop:
+agent:
   max_experiments: 10  # run 10 back-to-back
 ```
 

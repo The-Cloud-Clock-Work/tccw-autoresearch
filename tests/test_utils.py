@@ -1842,7 +1842,7 @@ from autoresearch.state import (
     get_tracked,
     get_effective_status,
 )
-from autoresearch.marker import MarkerStatus, Marker, Metric, Target, Schedule, LoopConfig
+from autoresearch.marker import AgentConfig, MarkerStatus, Marker, Metric, Target, Schedule
 
 
 def _make_state_marker(name="test") -> Marker:
@@ -1850,7 +1850,7 @@ def _make_state_marker(name="test") -> Marker:
         name=name,
         target=Target(mutable=["src/main.py"]),
         metric=Metric(command="echo 1", extract=r"\d+", direction="higher", baseline=1.0),
-        loop=LoopConfig(model="sonnet", budget_per_experiment="5m", max_experiments=10),
+        agent=AgentConfig(model="sonnet", budget_per_experiment="5m", max_experiments=10),
         schedule=Schedule(type="on-demand"),
     )
 

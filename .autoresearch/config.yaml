@@ -22,14 +22,12 @@ markers:
       extract: "grep -oP '\\d+(?= passed)'"
       threshold: 2541
       rework_attempts: 2
-    loop:
-      model: sonnet
-      budget_per_experiment: 25m
-      max_experiments: 10
     agent:
       name: copilot
       model: sonnet
       effort: medium
+      budget_per_experiment: 25m
+      max_experiments: 10
       permission_mode: bypassPermissions
       allowed_tools:
         - "Edit(tests/*)"

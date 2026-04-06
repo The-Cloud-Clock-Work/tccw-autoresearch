@@ -62,7 +62,7 @@ The core. The edit→test→measure→keep/discard loop with git worktree isolat
   - HIGH: worktree leak on unhandled exception → `try/finally` around main loop
   - HIGH: `status_override` set as string instead of enum → `MarkerStatus.NEEDS_HUMAN` directly
   - HIGH: silent `GitError` swallow on reset → `logger.warning`
-  - MEDIUM: hardcoded 5m rework budget → uses `marker.loop.budget_per_experiment`
+  - MEDIUM: hardcoded 5m rework budget → uses `marker.agent.budget_per_experiment`
   - MEDIUM: bare `subprocess.run` in `git_commit` → uses `_run_git` for consistent error handling
   - MEDIUM: inline `datetime` import → moved to module top
   - MEDIUM: temp dir leak on worktree creation failure → cleanup in except block

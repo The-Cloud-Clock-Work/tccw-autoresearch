@@ -24,9 +24,9 @@ from autoresearch.engine import (
     run_marker,
 )
 from autoresearch.marker import (
+    AgentConfig,
     Escalation,
     Guard,
-    LoopConfig,
     Marker,
     MarkerStatus,
     Metric,
@@ -72,7 +72,7 @@ def _make_marker(**overrides) -> Marker:
             direction=MetricDirection.HIGHER,
             baseline=3,
         ),
-        "loop": LoopConfig(max_experiments=5, budget_per_experiment="1m"),
+        "agent": AgentConfig(max_experiments=5, budget_per_experiment="1m"),
         "escalation": Escalation(),
         "schedule": Schedule(),
         "results": ResultsConfig(),
@@ -288,7 +288,7 @@ class TestRunMarker:
                 (wt / "src" / "main.py").write_text(f"x = {self.call_count + 1}\n")
                 return AgentResult(True, f"change x to {self.call_count + 1}", 0, "")
 
-        marker = _make_marker(loop=LoopConfig(max_experiments=2, budget_per_experiment="1m"))
+        marker = _make_marker(agent=AgentConfig(max_experiments=2, budget_per_experiment="1m"))
         result = run_marker(
             git_repo, marker, _make_state(), _make_tracked(),
             WritingAgent(), worktree_base=tmp_path / "wt", cleanup_worktree=False,
@@ -313,7 +313,7 @@ class TestRunMarker:
                 (wt / "src" / "main.py").write_text(f"x = {self.call_count}\n")
                 return AgentResult(True, "regressed", 0, "")
 
-        marker = _make_marker(loop=LoopConfig(max_experiments=2, budget_per_experiment="1m"))
+        marker = _make_marker(agent=AgentConfig(max_experiments=2, budget_per_experiment="1m"))
         result = run_marker(
             git_repo, marker, _make_state(), _make_tracked(),
             WritingAgent(), worktree_base=tmp_path / "wt", cleanup_worktree=False,
@@ -338,7 +338,7 @@ class TestRunMarker:
                 (wt / "src" / "main.py").write_text(f"x = {self.call_count + 10}\n")
                 return AgentResult(True, "crashed change", 0, "")
 
-        marker = _make_marker(loop=LoopConfig(max_experiments=2, budget_per_experiment="1m"))
+        marker = _make_marker(agent=AgentConfig(max_experiments=2, budget_per_experiment="1m"))
         result = run_marker(
             git_repo, marker, _make_state(), _make_tracked(),
             WritingAgent(), worktree_base=tmp_path / "wt", cleanup_worktree=False,
@@ -350,7 +350,7 @@ class TestRunMarker:
         runner = FakeAgentRunner([
             AgentResult(True, "no-op", 0, ""),
         ])
-        marker = _make_marker(loop=LoopConfig(max_experiments=1, budget_per_experiment="1m"))
+        marker = _make_marker(agent=AgentConfig(max_experiments=1, budget_per_experiment="1m"))
         result = run_marker(
             git_repo, marker, _make_state(), _make_tracked(),
             runner, worktree_base=tmp_path / "wt", cleanup_worktree=False,
@@ -375,7 +375,7 @@ class TestRunMarker:
                 return AgentResult(True, "attempt", 0, "")
 
         # 3 pivots at 5 failures each = 15 failures to halt
-        marker = _make_marker(loop=LoopConfig(max_experiments=20, budget_per_experiment="1m"))
+        marker = _make_marker(agent=AgentConfig(max_experiments=20, budget_per_experiment="1m"))
         result = run_marker(
             git_repo, marker, _make_state(), _make_tracked(),
             WritingAgent(), worktree_base=tmp_path / "wt", cleanup_worktree=False,
@@ -406,7 +406,7 @@ class TestRunMarker:
                 baseline=3,
                 target=10,
             ),
-            loop=LoopConfig(max_experiments=5, budget_per_experiment="1m"),
+            agent=AgentConfig(max_experiments=5, budget_per_experiment="1m"),
         )
         result = run_marker(
             git_repo, marker, _make_state(), _make_tracked(),
@@ -435,7 +435,7 @@ class TestRunMarker:
 
         marker = _make_marker(
             guard=Guard(command="pytest -q", extract=None, threshold=None, rework_attempts=1),
-            loop=LoopConfig(max_experiments=1, budget_per_experiment="1m"),
+            agent=AgentConfig(max_experiments=1, budget_per_experiment="1m"),
         )
         result = run_marker(
             git_repo, marker, _make_state(), _make_tracked(),
@@ -476,7 +476,7 @@ class TestRunMarker:
 
         marker = _make_marker(
             guard=Guard(command="pytest -q", extract=None, threshold=None, rework_attempts=2),
-            loop=LoopConfig(max_experiments=1, budget_per_experiment="1m"),
+            agent=AgentConfig(max_experiments=1, budget_per_experiment="1m"),
         )
         agent = CountingAgent()
         run_marker(
@@ -514,7 +514,7 @@ class TestRunMarker:
 
         marker = _make_marker(
             guard=Guard(command="pytest -q", extract=None, threshold=None, rework_attempts=3),
-            loop=LoopConfig(max_experiments=1, budget_per_experiment="1m"),
+            agent=AgentConfig(max_experiments=1, budget_per_experiment="1m"),
         )
         agent = CountingAgent()
         result = run_marker(
@@ -533,7 +533,7 @@ class TestRunMarker:
                 (wt / "src" / "main.py").write_text(f"x = {self.call_count}\n")
                 return AgentResult(True, "update", 0, "")
 
-        marker = _make_marker(loop=LoopConfig(max_experiments=1, budget_per_experiment="1m"))
+        marker = _make_marker(agent=AgentConfig(max_experiments=1, budget_per_experiment="1m"))
         tracked = _make_tracked()
         state = _make_state()
         state.markers.append(tracked)
@@ -1000,7 +1000,7 @@ class TestRunMarkerCleanup:
             exit_code=0, stdout="3 passed", stderr="", metric=3.0
         )
 
-        marker = _make_marker(loop=LoopConfig(max_experiments=1, budget_per_experiment="1m"))
+        marker = _make_marker(agent=AgentConfig(max_experiments=1, budget_per_experiment="1m"))
         runner = FakeAgentRunner([AgentResult(True, "done", 0, "")])
 
         with (
@@ -1093,12 +1093,8 @@ class TestClaudeCodeRunnerCmdBranches:
         cmd = self._invoke_capturing_cmd(marker, tmp_path)
         assert "--dangerously-skip-permissions" in cmd
 
-    def test_model_from_loop_when_agent_model_empty(self, tmp_path):
-        from autoresearch.marker import AgentConfig
-        marker = _make_marker(
-            agent=AgentConfig(model=""),
-            loop=LoopConfig(model="opus", budget_per_experiment="5m"),
-        )
+    def test_model_from_agent_config_opus(self, tmp_path):
+        marker = _make_marker(agent=AgentConfig(model="opus", budget_per_experiment="5m"))
         cmd = self._invoke_capturing_cmd(marker, tmp_path)
         assert "--model" in cmd
         idx = cmd.index("--model")
@@ -1117,7 +1113,7 @@ class TestRunMarkerStatePath:
             metric=5.0, log_path=tmp_path / "run.log",
         )
         state_path = tmp_path / "state.json"
-        marker = _make_marker(loop=LoopConfig(max_experiments=1, budget_per_experiment="1m"))
+        marker = _make_marker(agent=AgentConfig(max_experiments=1, budget_per_experiment="1m"))
 
         class WriteAgent(AgentRunner):
             def invoke(self, wt, prog, budget):
@@ -1143,7 +1139,7 @@ class TestRunMarkerNoCleanup:
             exit_code=0, stdout="5 passed", stderr="",
             metric=5.0, log_path=tmp_path / "run.log",
         )
-        marker = _make_marker(loop=LoopConfig(max_experiments=1, budget_per_experiment="1m"))
+        marker = _make_marker(agent=AgentConfig(max_experiments=1, budget_per_experiment="1m"))
 
         class WriteAgent(AgentRunner):
             def invoke(self, wt, prog, budget):
@@ -1199,7 +1195,7 @@ class TestHandleGuardFailureAgentFails:
 
         marker = _make_marker(
             guard=Guard(command="pytest -q", extract=None, threshold=None, rework_attempts=1),
-            loop=LoopConfig(max_experiments=1, budget_per_experiment="1m"),
+            agent=AgentConfig(max_experiments=1, budget_per_experiment="1m"),
         )
         result = run_marker(
             git_repo, marker, _make_state(), _make_tracked(),
@@ -2420,23 +2416,12 @@ class TestClaudeCodeRunnerAllowedTools:
         assert "--verbose" in cmd
         assert "--debug" in cmd
 
-    def test_model_from_marker_loop(self, tmp_path):
-        from autoresearch.marker import AgentConfig
-        loop = LoopConfig(max_experiments=1, budget_per_experiment="1m", model="opus")
-        marker = _make_marker(agent=AgentConfig(model=""), loop=loop)
+    def test_model_from_agent_config(self, tmp_path):
+        marker = _make_marker(agent=AgentConfig(model="opus", max_experiments=1, budget_per_experiment="1m"))
         cmd = self._run_and_capture_cmd(marker, tmp_path)
         assert "--model" in cmd
         idx = cmd.index("--model")
         assert cmd[idx + 1] == "opus"
-
-    def test_agent_model_overrides_loop_model(self, tmp_path):
-        from autoresearch.marker import AgentConfig
-        loop = LoopConfig(max_experiments=1, budget_per_experiment="1m", model="opus")
-        marker = _make_marker(agent=AgentConfig(model="haiku"), loop=loop)
-        cmd = self._run_and_capture_cmd(marker, tmp_path)
-        assert "--model" in cmd
-        idx = cmd.index("--model")
-        assert cmd[idx + 1] == "haiku"
 
 
 # ---------------------------------------------------------------------------
@@ -3129,7 +3114,7 @@ class TestRunMarkerCleanupGitError:
     def test_cleanup_worktree_git_error_logged_not_raised(self, git_repo, tmp_path):
         from autoresearch.worktree import GitError
         # Agent fails -> discard path; cleanup_worktree=True but remove raises GitError
-        marker = _make_marker(loop=LoopConfig(max_experiments=1, budget_per_experiment="1m"))
+        marker = _make_marker(agent=AgentConfig(max_experiments=1, budget_per_experiment="1m"))
         runner = FakeAgentRunner([AgentResult(True, "no-op", 0, "")])
         with patch("autoresearch.engine.remove_worktree", side_effect=GitError("cleanup failed")):
             result = run_marker(
@@ -3146,7 +3131,7 @@ class TestRunMarkerCleanupGitError:
 class TestRunMarkerFinalConfidence:
     def test_final_confidence_none_when_no_kept(self, git_repo, tmp_path):
         runner = FakeAgentRunner([AgentResult(True, "no-op", 0, "")])
-        marker = _make_marker(loop=LoopConfig(max_experiments=1, budget_per_experiment="1m"))
+        marker = _make_marker(agent=AgentConfig(max_experiments=1, budget_per_experiment="1m"))
         result = run_marker(
             git_repo, marker, _make_state(), _make_tracked(),
             runner, worktree_base=tmp_path / "wt", cleanup_worktree=False,
@@ -3168,7 +3153,7 @@ class TestRunMarkerFinalConfidence:
                 (wt / "src" / "main.py").write_text(f"x = {self.call_count + 100}\n")
                 return AgentResult(True, "big improvement", 0, "")
 
-        marker = _make_marker(loop=LoopConfig(max_experiments=1, budget_per_experiment="1m"))
+        marker = _make_marker(agent=AgentConfig(max_experiments=1, budget_per_experiment="1m"))
         result = run_marker(
             git_repo, marker, _make_state(), _make_tracked(),
             WritingAgent(), worktree_base=tmp_path / "wt", cleanup_worktree=False,
@@ -3840,7 +3825,7 @@ class TestTargetReachedComprehensive:
             target=Target(mutable=["a.py"]),
             metric=Metric(command="c", extract="e",
                           direction=direction, baseline=baseline, target=target),
-            loop=LoopConfig(),
+            agent=AgentConfig(),
         )
 
     def test_higher_at_target_exact(self):
@@ -4518,7 +4503,7 @@ class TestTargetReachedMore:
                 baseline=baseline,
                 target=target_value,
             ),
-            loop=LoopConfig(model="sonnet", budget_per_experiment="5m", max_experiments=5),
+            agent=AgentConfig(model="sonnet", budget_per_experiment="5m", max_experiments=5),
         )
 
     def test_exactly_at_target_higher(self):
@@ -5080,18 +5065,18 @@ class TestTargetReachedB:
 
     def test_no_target_returns_false(self):
         from autoresearch.engine import _target_reached
-        from autoresearch.marker import Marker, Target, Metric, LoopConfig
+        from autoresearch.marker import AgentConfig, Marker, Target, Metric
         m = Marker(
             name="x",
             target=Target(mutable=["f.py"]),
             metric=Metric(command="echo 1", extract=r"\d+", direction="higher", baseline=0.0),
-            loop=LoopConfig(model="sonnet", budget_per_experiment="5m", max_experiments=5),
+            agent=AgentConfig(model="sonnet", budget_per_experiment="5m", max_experiments=5),
         )
         assert _target_reached(m, 999.0) is False
 
 
 def _make_marker_with_target(target_val: float, direction: str):
-    from autoresearch.marker import Marker, Target, Metric, LoopConfig
+    from autoresearch.marker import AgentConfig, Marker, Target, Metric
     return Marker(
         name="x",
         target=Target(mutable=["f.py"]),
@@ -5102,7 +5087,7 @@ def _make_marker_with_target(target_val: float, direction: str):
             baseline=0.0,
             target=target_val,
         ),
-        loop=LoopConfig(model="sonnet", budget_per_experiment="5m", max_experiments=5),
+        agent=AgentConfig(model="sonnet", budget_per_experiment="5m", max_experiments=5),
     )
 
 

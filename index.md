@@ -69,7 +69,7 @@ markers:
     target:
       mutable: ["src/**/*.py"]
       immutable: ["tests/**/*.py"]
-    loop:
+    agent:
       budget_per_experiment: 20m
       max_experiments: 10
 ```

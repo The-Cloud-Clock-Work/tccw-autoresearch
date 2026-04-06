@@ -27,7 +27,7 @@ from autoresearch.marker import (
     Metric,
     Schedule,
     Target,
-    LoopConfig,
+    AgentConfig,
 )
 from autoresearch.state import AppState, TrackedMarker
 
@@ -41,7 +41,7 @@ def _make_marker(name="test", schedule_type="on-demand", cron=None) -> Marker:
         name=name,
         target=Target(mutable=["src/main.py"]),
         metric=Metric(command="echo 1", extract=r"\d+", direction="higher", baseline=1.0),
-        loop=LoopConfig(model="sonnet", budget_per_experiment="5m", max_experiments=10),
+        agent=AgentConfig(model="sonnet", budget_per_experiment="5m", max_experiments=10),
         schedule=Schedule(type=schedule_type, cron=cron),
     )
 

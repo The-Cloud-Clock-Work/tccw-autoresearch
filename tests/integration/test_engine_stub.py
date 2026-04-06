@@ -61,7 +61,7 @@ def engine_repo(git_repo):
                 "direction": "lower",
                 "baseline": 10,
             },
-            "loop": {
+            "agent": {
                 "model": "stub",
                 "budget_per_experiment": "5m",
                 "max_experiments": 1,

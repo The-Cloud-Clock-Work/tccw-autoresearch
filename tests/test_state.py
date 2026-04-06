@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from autoresearch.marker import Marker, MarkerStatus, Metric, MetricDirection, Target, LoopConfig
+from autoresearch.marker import Marker, MarkerStatus, Metric, MetricDirection, Target
 from autoresearch.state import (
     AppState,
     TrackedMarker,
@@ -26,7 +26,7 @@ def _make_marker(name: str = "test-marker") -> Marker:
             direction=MetricDirection.HIGHER,
             baseline=10,
         ),
-        loop=LoopConfig(),
+
     )
 
 
@@ -250,7 +250,8 @@ class TestTrackMarkerExtended:
             description="test",
             target=Target(mutable=["src/*.py"]),
             metric=Metric(command="echo 1", extract="cat", direction=MetricDirection.HIGHER, baseline=0.0),
-            loop=LoopConfig(budget=5),
+
+
         )
 
     def test_tracking_sets_marker_name(self, tmp_path):
@@ -287,7 +288,8 @@ class TestTrackMarkerExtended:
             description="t",
             target=Target(mutable=["src/*.py"]),
             metric=Metric(command="echo 1", extract="cat", direction=MetricDirection.HIGHER, baseline=42.0),
-            loop=LoopConfig(budget=3),
+
+
         )
         tracked = track_marker(state, tmp_path, m)
         assert tracked.baseline == 42.0
@@ -300,7 +302,8 @@ class TestUntrackMarkerExtended:
             description="test",
             target=Target(mutable=["src/*.py"]),
             metric=Metric(command="echo 1", extract="cat", direction=MetricDirection.HIGHER, baseline=0.0),
-            loop=LoopConfig(budget=5),
+
+
         )
 
     def test_untrack_nonexistent_returns_false(self):
@@ -332,7 +335,8 @@ class TestGetTrackedExtended:
             description="test",
             target=Target(mutable=["src/*.py"]),
             metric=Metric(command="echo 1", extract="cat", direction=MetricDirection.HIGHER, baseline=0.0),
-            loop=LoopConfig(budget=5),
+
+
         )
 
     def test_get_tracked_returns_correct(self, tmp_path):

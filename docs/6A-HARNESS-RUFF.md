@@ -52,7 +52,7 @@ markers:
     guard:
       command: "ruff check . 2>&1 | grep -qP 'Found \\d+'"
       rework_attempts: 1
-    loop:
+    agent:
       budget_per_experiment: 20m
       max_experiments: 1
 ```
@@ -123,7 +123,7 @@ markers:
       issues_command: "ruff check . --output-format concise 2>&1 | head -30"
     guard:
       command: "ruff check . 2>&1 | grep -qP 'Found \\d+'"
-    loop:
+    agent:
       model: sonnet
       budget_per_experiment: 20m
       max_experiments: 5
