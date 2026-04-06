@@ -18,23 +18,87 @@ Claude opens. It scans your project. Asks what you want to improve. Configures e
 
 ---
 
-## What Is This?
+## How It Works
 
-AutoResearch is an orchestrator that sits on top of [Claude Code](https://docs.anthropic.com/en/docs/claude-code). It gives Claude a metric, a budget, and permission to edit specific files — then measures whether the code got better.
+```mermaid
+flowchart TD
+    subgraph INSTALL["<b>1 ◼ INSTALL</b>"]
+        direction LR
+        A1["pip install<br/>tccw-autoresearch"]:::install
+        A2["cd your-project"]:::install
+        A1 --> A2
+    end
 
-```
-autoresearch (orchestrator)
-  └── claude (the brain)
-        ├── reads your code
-        ├── forms a hypothesis
-        ├── edits files
-        ├── runs your metric
-        └── commits if improved, reverts if not
+    subgraph ONBOARD["<b>2 ◼ ONBOARD</b>"]
+        direction TB
+        B1["autoresearch init"]:::cmd
+        B2["Claude Code opens<br/>interactive session"]:::claude
+        B3["Scans your project<br/>detects tech stack"]:::claude
+        B4["Asks: what to improve?<br/>lint · coverage · build time"]:::question
+        B5["Asks: which files<br/>can the agent edit?"]:::question
+        B6["Writes config + measures baseline"]:::config
+        B1 --> B2 --> B3 --> B4 --> B5 --> B6
+    end
+
+    subgraph CONFIG["<b>3 ◼ .autoresearch/</b>"]
+        direction LR
+        C1["config.yaml<br/>metric · rules · budget"]:::config
+        C2["agents/default/<br/>CLAUDE.md · settings.json"]:::config
+        C3["state.json<br/>progress · results"]:::state
+    end
+
+    subgraph ENGINE["<b>4 ◼ EXPERIMENT LOOP</b>"]
+        direction TB
+        D1["Create git worktree<br/>isolated branch"]:::engine
+        D2["Spawn Claude Code agent<br/>with budget + permissions"]:::claude
+        D3["Agent reads code<br/>forms hypothesis<br/>edits mutable files"]:::claude
+        D4["Run metric command<br/>extract number"]:::metric
+        D5{{"Improved?"}}:::decision
+        D6["KEEP<br/>git commit"]:::keep
+        D7["DISCARD<br/>git reset"]:::discard
+        D1 --> D2 --> D3 --> D4 --> D5
+        D5 -->|"Yes"| D6
+        D5 -->|"No"| D7
+        D6 --> D8
+        D7 --> D8["Next experiment<br/>or budget exhausted"]:::engine
+    end
+
+    subgraph PUBLISH["<b>5 ◼ RESULTS</b>"]
+        direction LR
+        E1["git push branch"]:::publish
+        E2["Create PR<br/>with audit trail"]:::publish
+        E3["Auto-merge<br/>to dev"]:::publish
+        E1 --> E2 --> E3
+    end
+
+    INSTALL --> ONBOARD
+    ONBOARD --> CONFIG
+    CONFIG --> ENGINE
+    ENGINE --> PUBLISH
+
+    classDef install fill:#1e3a5f,stroke:#4a9eff,color:#fff,stroke-width:2px
+    classDef cmd fill:#0d1117,stroke:#58a6ff,color:#58a6ff,stroke-width:2px
+    classDef claude fill:#6e40c9,stroke:#a371f7,color:#fff,stroke-width:2px
+    classDef question fill:#8b5cf6,stroke:#c4b5fd,color:#fff,stroke-width:2px
+    classDef config fill:#0e4429,stroke:#3fb950,color:#fff,stroke-width:2px
+    classDef state fill:#1a4731,stroke:#56d364,color:#fff,stroke-width:1px
+    classDef engine fill:#1c1917,stroke:#f97316,color:#fff,stroke-width:2px
+    classDef metric fill:#713f12,stroke:#fbbf24,color:#fff,stroke-width:2px
+    classDef decision fill:#854d0e,stroke:#facc15,color:#fff,stroke-width:3px
+    classDef keep fill:#14532d,stroke:#22c55e,color:#fff,stroke-width:3px
+    classDef discard fill:#7f1d1d,stroke:#ef4444,color:#fff,stroke-width:3px
+    classDef publish fill:#1e3a5f,stroke:#38bdf8,color:#fff,stroke-width:2px
 ```
 
 **You define the metric. Claude does the work. AutoResearch decides what to keep.**
 
 Reduce lint errors. Increase test coverage. Cut build times. Fix code smells. Anything you can measure with a shell command.
+
+---
+
+## What Is This?
+
+AutoResearch is an orchestrator that sits on top of [Claude Code](https://docs.anthropic.com/en/docs/claude-code). It gives Claude a metric, a budget, and permission to edit specific files — then measures whether the code got better.
 
 ---
 
