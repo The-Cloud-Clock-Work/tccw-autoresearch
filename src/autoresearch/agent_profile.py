@@ -233,9 +233,6 @@ def init_autoresearch_dir(repo_path: Path) -> Path:
             "# Autoresearch runtime artifacts — do not commit\n"
             "state.json\n"
             "*/logs/\n"
-            "*/run.log\n"
-            "*/ideas.md\n"
-            "*/results.tsv\n"
         )
 
     # Symlink default agent files into all custom agents
@@ -289,9 +286,6 @@ def ensure_agent_dir(
             "# Autoresearch runtime artifacts — do not commit\n"
             "state.json\n"
             "*/logs/\n"
-            "*/run.log\n"
-            "*/ideas.md\n"
-            "*/results.tsv\n"
         )
 
     settings = generate_settings(marker, worktree_path)
