@@ -100,6 +100,8 @@ Reduce lint errors. Increase test coverage. Cut build times. Fix code smells. An
 
 ![Claude asks which files the agent can edit — mutable vs immutable boundaries](docs/images/onboard-mutable.png)
 
+![Review and submit — mutable and immutable file boundaries confirmed](docs/images/onboard-submit.png)
+
 ---
 
 ## What Is This?
