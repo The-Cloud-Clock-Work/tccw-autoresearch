@@ -154,15 +154,17 @@ Use `--no-claude` to skip the wizard and edit config manually.
 ### 3. Run
 
 ```bash
-# Interactive TUI
+# Interactive TUI — discovers markers in current directory
 autoresearch
 
-# Headless (CI/CD, cron, scripts)
-autoresearch run -m my-marker --headless
+# Run all active markers in current directory
+autoresearch run
 
-# Check progress
-autoresearch status --headless
-autoresearch results -m my-marker --headless
+# Run a specific marker
+autoresearch run -m lint-quality
+
+# Headless (CI/CD, cron, scripts)
+autoresearch --headless run -m lint-quality
 ```
 
 ### 4. What Happens
@@ -179,7 +181,7 @@ LOOP (per experiment):
   8. REPEAT until budget exhausted or HALT
 ```
 
-Every kept experiment is a commit. Auto-merge creates PRs with full audit trail.
+Every kept experiment is a commit. The engine pushes the branch and creates a PR to your configured `target_branch` with full audit trail.
 
 ---
 
@@ -201,13 +203,21 @@ markers:
       direction: lower                # lower = better
       baseline: 163
       issues_command: "ruff check src/ --output-format concise | head -30"
-    loop:
-      model: sonnet
-      budget_per_experiment: 20m
-      max_experiments: 10
+    agent:
+      name: default
+      model: sonnet                   # Claude model to use
+      effort: medium                  # low | medium | high
+      permission_mode: bypassPermissions
+      budget_per_experiment: 20m      # time limit per experiment
+      max_experiments: 10             # experiments per run
+      env_file: null                  # path to .env file (optional)
+      allowed_tools: []
+      disallowed_tools: []
     auto_merge:
-      enabled: true
-      target_branch: dev
+      enabled: true                   # auto-merge PRs when experiments succeed
+      target_branch: main             # PR target branch
+    schedule:
+      type: on-demand                 # on-demand | overnight | weekend | cron
 ```
 
 ### Common Metrics
@@ -263,7 +273,7 @@ Custom agents inherit default hooks (budget countdown) via symlinks.
 | **Statistical confidence** | MAD-based scoring after 3+ experiments |
 | **Dual-gate guard** | Metric + regression guard — prevents gaming |
 | **Ideas backlog** | Failed experiments log why — future sessions don't repeat |
-| **Auto-merge** | Every KEEP → PR → auto-merge to dev → promotion PR to main |
+| **Auto-merge** | Every KEEP → push branch → PR to target_branch → squash merge |
 | **Always-commit** | Engine commits after agent exits regardless of timeout |
 
 ---
@@ -271,23 +281,29 @@ Custom agents inherit default hooks (budget countdown) via symlinks.
 ## CLI Reference
 
 ```bash
-autoresearch init          # AI-guided setup (spawns Claude Code)
-autoresearch               # Interactive TUI
-autoresearch run           # Run experiments
-autoresearch status        # Marker dashboard
-autoresearch results       # Experiment history
-autoresearch confidence    # Statistical confidence scores
-autoresearch ideas         # Ideas backlog
-autoresearch add           # Register a marker
-autoresearch detach        # Unregister a marker
-autoresearch skip          # Skip current experiment
-autoresearch pause         # Pause a marker
-autoresearch finalize      # Clean branches from experiment history
-autoresearch merge         # Merge finalized branch
-autoresearch daemon start  # Scheduled overnight runs
+autoresearch                # Interactive TUI (discovers markers in CWD)
+autoresearch init           # AI-guided setup (spawns Claude Code)
+autoresearch run            # Run all active markers in CWD
+autoresearch run -m <name>  # Run a specific marker
+autoresearch status         # Marker dashboard
+autoresearch results        # Experiment history
+autoresearch confidence     # Statistical confidence scores
+autoresearch ideas          # Ideas backlog
+autoresearch clean          # Delete stale experiment branches
+autoresearch clean --remote # Also delete remote branches
+autoresearch finalize       # Cherry-pick kept experiments into clean branch
+autoresearch merge          # Merge finalized branch into target
+autoresearch add            # Register marker in global state (for daemon)
+autoresearch detach         # Unregister a marker
+autoresearch skip           # Skip current experiment
+autoresearch pause          # Pause a marker
+autoresearch daemon start   # Scheduled overnight runs
+autoresearch daemon stop    # Stop the daemon
+autoresearch daemon status  # Check daemon status
+autoresearch daemon logs    # View daemon logs
 ```
 
-All commands support `--headless` for JSON output.
+All commands support `--headless` for JSON output. No `autoresearch add` needed for local runs — the CLI reads `.autoresearch/config.yaml` from CWD.
 
 ---
 
