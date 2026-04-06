@@ -102,6 +102,8 @@ Reduce lint errors. Increase test coverage. Cut build times. Fix code smells. An
 
 ![Review and submit — mutable and immutable file boundaries confirmed](docs/images/onboard-submit.png)
 
+![Generated config.yaml — complete marker with metric, guard, loop, agent, and schedule](docs/images/onboard-config.png)
+
 ---
 
 ## What Is This?
