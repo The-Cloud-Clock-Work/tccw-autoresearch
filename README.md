@@ -1,5 +1,12 @@
 # The Cloud Clock Work - Autoresearch
 
+[![Quality Gate](https://img.shields.io/endpoint?url=https://the-cloud-clock-work.github.io/tccw-autoresearch/badges/quality-gate.json)](https://the-cloud-clock-work.github.io/tccw-autoresearch/)
+[![Coverage](https://img.shields.io/endpoint?url=https://the-cloud-clock-work.github.io/tccw-autoresearch/badges/coverage.json)](https://the-cloud-clock-work.github.io/tccw-autoresearch/)
+[![Bugs](https://img.shields.io/endpoint?url=https://the-cloud-clock-work.github.io/tccw-autoresearch/badges/bugs.json)](https://the-cloud-clock-work.github.io/tccw-autoresearch/)
+[![Vulnerabilities](https://img.shields.io/endpoint?url=https://the-cloud-clock-work.github.io/tccw-autoresearch/badges/vulnerabilities.json)](https://the-cloud-clock-work.github.io/tccw-autoresearch/)
+[![Code Smells](https://img.shields.io/endpoint?url=https://the-cloud-clock-work.github.io/tccw-autoresearch/badges/code-smells.json)](https://the-cloud-clock-work.github.io/tccw-autoresearch/)
+[![PyPI](https://img.shields.io/pypi/v/tccw-autoresearch)](https://pypi.org/project/tccw-autoresearch/)
+
 **A Claude Code wrapper that makes any codebase measurably better overnight.**
 
 ```bash
@@ -245,7 +252,7 @@ src/autoresearch/
 
 - **PyPI:** [tccw-autoresearch](https://pypi.org/project/tccw-autoresearch/)
 - **Docs:** [the-cloud-clock-work.github.io/tccw-autoresearch](https://the-cloud-clock-work.github.io/tccw-autoresearch/)
-- **SonarQube:** 94.8% coverage, 0 bugs, 0 vulnerabilities, 25 code smells
+- **SonarQube:** See badges above — auto-updated on every scan
 
 ---
 

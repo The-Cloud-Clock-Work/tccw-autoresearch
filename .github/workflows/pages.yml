@@ -8,6 +8,7 @@ on:
       - "index.md"
       - "_config.yml"
       - "assets/**"
+      - "badges/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 

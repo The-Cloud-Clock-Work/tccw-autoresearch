@@ -1,0 +1,93 @@
+name: Update SonarQube Badges
+
+on:
+  workflow_run:
+    workflows: ["SonarQube Scan"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-badges:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch SonarQube metrics
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          METRICS=$(curl -sf -u "${SONAR_TOKEN}:" \
+            -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" \
+            -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" \
+            "${SONAR_HOST_URL}/api/measures/component?component=tccw-autoresearch&metricKeys=coverage,bugs,vulnerabilities,code_smells,alert_status,security_rating,duplicated_lines_density")
+
+          mkdir -p badges
+
+          get_val() { echo "$METRICS" | jq -r ".component.measures[] | select(.metric==\"$1\") | .value"; }
+
+          COVERAGE=$(get_val coverage)
+          BUGS=$(get_val bugs)
+          VULNS=$(get_val vulnerabilities)
+          SMELLS=$(get_val code_smells)
+          GATE=$(get_val alert_status)
+          DUPES=$(get_val duplicated_lines_density)
+
+          # Color logic
+          cov_color="red"
+          [[ $(echo "$COVERAGE > 80" | bc -l) -eq 1 ]] && cov_color="green"
+          [[ $(echo "$COVERAGE > 60" | bc -l) -eq 1 ]] && [[ $(echo "$COVERAGE <= 80" | bc -l) -eq 1 ]] && cov_color="yellow"
+
+          gate_color="red"
+          [[ "$GATE" == "OK" ]] && gate_color="brightgreen"
+
+          bugs_color="brightgreen"
+          [[ "$BUGS" -gt 0 ]] && bugs_color="red"
+
+          vulns_color="brightgreen"
+          [[ "$VULNS" -gt 0 ]] && vulns_color="red"
+
+          smells_color="green"
+          [[ "$SMELLS" -gt 10 ]] && smells_color="yellow"
+          [[ "$SMELLS" -gt 50 ]] && smells_color="red"
+
+          # Generate shields.io endpoint JSON
+          cat > badges/quality-gate.json <<EOF
+          {"schemaVersion":1,"label":"quality gate","message":"$GATE","color":"$gate_color"}
+          EOF
+
+          cat > badges/coverage.json <<EOF
+          {"schemaVersion":1,"label":"coverage","message":"${COVERAGE}%","color":"$cov_color"}
+          EOF
+
+          cat > badges/bugs.json <<EOF
+          {"schemaVersion":1,"label":"bugs","message":"$BUGS","color":"$bugs_color"}
+          EOF
+
+          cat > badges/vulnerabilities.json <<EOF
+          {"schemaVersion":1,"label":"vulnerabilities","message":"$VULNS","color":"$vulns_color"}
+          EOF
+
+          cat > badges/code-smells.json <<EOF
+          {"schemaVersion":1,"label":"code smells","message":"$SMELLS","color":"$smells_color"}
+          EOF
+
+          cat > badges/duplications.json <<EOF
+          {"schemaVersion":1,"label":"duplications","message":"${DUPES}%","color":"brightgreen"}
+          EOF
+
+      - name: Commit badges
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add badges/
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "chore: update SonarQube badges"
+          git push
