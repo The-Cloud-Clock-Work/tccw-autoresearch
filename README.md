@@ -67,7 +67,7 @@ flowchart TD
         direction LR
         E1["git push branch"]:::publish
         E2["Create PR<br/>with audit trail"]:::publish
-        E3["Auto-merge<br/>to dev"]:::publish
+        E3["Auto-merge<br/>to main"]:::publish
         E1 --> E2 --> E3
     end
 
@@ -102,7 +102,7 @@ Reduce lint errors. Increase test coverage. Cut build times. Fix code smells. An
 
 ![Review and submit — mutable and immutable file boundaries confirmed](docs/images/onboard-submit.png)
 
-![Generated config.yaml — complete marker with metric, guard, loop, agent, and schedule](docs/images/onboard-config.png)
+![Generated config.yaml — complete marker with metric, guard, agent, and schedule](docs/images/onboard-config.png)
 
 ### `autoresearch run` — live experiment progress
 
@@ -125,7 +125,7 @@ That's it. No Docker. No GPU. No ML frameworks. No infrastructure.
 
 ---
 
-## How It Works
+## Getting Started
 
 ### 1. Install
 
