@@ -7,46 +7,92 @@ nav_order: 20
 
 # CLI
 
-> CLI commands, interactive + headless modes.
+> All commands, interactive TUI, headless mode.
 
 ## Overview
 
-The CLI (`cli.py`) is built with Typer and Rich. Every command supports two modes:
+Built with Typer + Rich. Every command supports `--headless` for JSON output.
 
-- **Interactive** — Rich TUI with tables, menus, and color output
-- **Headless** — `--headless` flag produces structured JSON for automation
+The CLI is **CWD-aware** — run from any directory with `.autoresearch/config.yaml` and it auto-discovers markers. No registration needed.
 
 ## Commands
 
 | Command | Purpose |
 |---------|---------|
-| `autoresearch` | Default: interactive home screen (marker selection, action keys) |
-| `autoresearch list` | List all tracked markers |
-| `autoresearch status -m <repo:marker>` | Show detailed status for a marker |
-| `autoresearch results -m <repo:marker>` | View experiment results |
-| `autoresearch ideas -m <repo:marker>` | View ideas backlog |
-| `autoresearch confidence -m <repo:marker>` | View statistical confidence scores |
-| `autoresearch init` | Scaffold `.autoresearch/` with default config + agent profile |
-| `autoresearch add` | Register a marker for tracking |
-| `autoresearch detach` | Unregister a marker from tracking |
-| `autoresearch skip -m <repo:marker>` | Set marker status to `skip` |
-| `autoresearch pause -m <repo:marker>` | Set marker status to `paused` |
-| `autoresearch run -m <repo:marker>` | Run improvement loop for a marker |
-| `autoresearch finalize -m <repo:marker>` | Cherry-pick + squash winning commits into clean branch |
-| `autoresearch merge -m <repo:marker>` | Merge finalized branch |
-| `autoresearch daemon start\|stop\|status\|logs` | Daemon management |
+| `autoresearch` | Interactive TUI — discovers markers, numbered menu |
+| `autoresearch init` | AI-guided setup (spawns Claude Code with `/onboard` skill) |
+| `autoresearch run` | Run all active markers in current directory |
+| `autoresearch run -m <name>` | Run a specific marker by name |
+| `autoresearch status -m <name>` | Marker dashboard |
+| `autoresearch results -m <name>` | Experiment history |
+| `autoresearch confidence -m <name>` | Statistical confidence scores |
+| `autoresearch ideas -m <name>` | Ideas backlog |
+| `autoresearch clean` | Delete stale experiment branches (keeps latest) |
+| `autoresearch clean --remote` | Also delete remote branches |
+| `autoresearch finalize -m <name>` | Cherry-pick kept experiments into clean branch |
+| `autoresearch merge -m <name>` | Merge finalized branch into target |
+| `autoresearch add --path .` | Register marker in global state (for daemon) |
+| `autoresearch detach -m <name>` | Unregister a marker |
+| `autoresearch skip -m <name>` | Skip current experiment |
+| `autoresearch pause -m <name>` | Pause a marker |
+| `autoresearch daemon start` | Start scheduled overnight runs |
+| `autoresearch daemon stop` | Stop the daemon |
+| `autoresearch daemon status` | Check daemon health |
+| `autoresearch daemon logs` | View daemon logs |
 
-## Global Flags
+## Interactive TUI
 
-| Flag | Purpose |
-|------|---------|
-| `--headless` | JSON output, no TUI |
-| `-h`, `--help` | Help text |
+Running `autoresearch` with no arguments opens the TUI:
 
-## Marker ID Format
+```
+agentihooks-bundle — 1 marker(s)
+┌───┬──────────────┬────────┬───────────┬─────────────────────────────┐
+│ # │ Marker       │ Status │ Direction │ Metric Command              │
+├───┼──────────────┼────────┼───────────┼─────────────────────────────┤
+│ 1 │ doc-coverage │ active │ higher    │ ls docs/skills/*.md ...     │
+└───┴──────────────┴────────┴───────────┴─────────────────────────────┘
 
-Markers are referenced by full ID: `repo_name:marker_name` (e.g., `tccw-autoresearch:test-suite-health`).
+  1  Run doc-coverage
+  2  Status
+  3  Init / reconfigure
+  4  Quit
+
+Select [1/2/3/4]:
+```
+
+## Live Progress Panel
+
+During experiment runs, a Rich panel shows real-time progress:
+
+```
+┌─ autoresearch ◼ my-repo:my-marker ──────────────────┐
+│ Baseline: 1 → Current: 14 (higher)  ◼  Budget: 10m  │
+│                                                      │
+│ ▓▓▓▓▓▓▓▓▓░░░░░░░░░ 3/10  Kept: 1  Disc: 2  Crash: 0│
+│                                                      │
+│  #  Status   Metric  Delta  Description              │
+│  1  KEEP        14    +13   Created 13 skill docs    │
+│  2  DISCARD     14      0   All docs already exist   │
+│  3  DISCARD     14      0   Nothing to improve       │
+│  4  ⠋ running...                                     │
+└──────────────────────────────────────────────────────┘
+```
 
 ## Headless Mode
 
-When `--headless` is set, all output is structured JSON via `ok_json()` / `err_json()` helpers in `cli_utils.py`. Exit codes: 0 = success, 1 = error, 2 = usage error.
+Add `--headless` before the subcommand for JSON output:
+
+```bash
+autoresearch --headless run -m my-marker
+autoresearch --headless status -m my-marker
+```
+
+All output goes to stdout as structured JSON.
+
+## CWD Resolution
+
+The CLI resolves markers in this order:
+
+1. **No `-m` flag**: load all active markers from `.autoresearch/config.yaml` in CWD
+2. **`-m simple-name`**: find marker by name in CWD config
+3. **`-m repo:name`**: look up in global state (for daemon/multi-repo use)

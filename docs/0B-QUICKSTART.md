@@ -7,65 +7,71 @@ nav_order: 3
 
 # Quickstart
 
-> Installation, first marker, first run.
+> Install, onboard, run. Three commands.
 
-## Installation
+## Install
 
 ```bash
-pip install -e ".[dev]"
+pip install tccw-autoresearch
 ```
 
-Requires Python 3.10+, plus [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`claude` CLI) on PATH.
+Requires Python 3.10+ and [Claude Code](https://docs.anthropic.com/en/docs/claude-code) on PATH.
 
-## Initialize Your Repo
+## Onboard Your Repo
 
 ```bash
 cd /path/to/your-project
 autoresearch init
 ```
 
-This creates `.autoresearch/config.yaml` with a starter marker and `.autoresearch/agents/` with the default agent profile.
+Claude opens interactively. It scans your project, asks what you want to improve, configures the marker, and measures your baseline. Everything is written to `.autoresearch/config.yaml`.
 
-## Configure Your Marker
-
-Edit `.autoresearch/config.yaml`:
-
-```yaml
-markers:
-  - name: my-first-marker
-    description: Improve test pass rate
-    status: active
-    target:
-      mutable:
-        - src/**/*.py
-      immutable:
-        - tests/test_main.py
-    metric:
-      command: "pytest tests/test_main.py -q --tb=no 2>&1 | tail -1"
-      extract: "grep -oP '\\d+(?= passed)'"
-      direction: higher
-      baseline: 10
-    loop:
-      model: sonnet
-      budget_per_experiment: 10m
-      max_experiments: 20
-```
+Use `--no-claude` to skip the wizard and edit config manually.
 
 ## Run
 
 ```bash
-# Interactive mode
-autoresearch run -m my-project:my-first-marker
+# Run all active markers (auto-discovers config in current directory)
+autoresearch run
+
+# Run a specific marker
+autoresearch run -m my-marker
 
 # Headless mode (CI/CD, automation)
-autoresearch run -m my-project:my-first-marker --headless
+autoresearch --headless run
 ```
 
-Note: marker IDs use the format `repo_name:marker_name`.
+No registration needed. The CLI reads `.autoresearch/config.yaml` from the current directory.
 
-## Check Status
+## Interactive TUI
 
 ```bash
-autoresearch status -m my-project:my-first-marker
-autoresearch results -m my-project:my-first-marker
+autoresearch
 ```
+
+Shows a numbered menu with your markers. Select to run, check status, or reconfigure.
+
+## Check Results
+
+```bash
+autoresearch status -m my-marker
+autoresearch results -m my-marker
+```
+
+## Clean Up Branches
+
+```bash
+autoresearch clean              # delete stale experiment branches (keeps latest)
+autoresearch clean --remote     # also delete remote branches
+autoresearch clean --dry-run    # preview what would be deleted
+```
+
+## Scheduled Runs (Daemon)
+
+```bash
+autoresearch daemon start    # runs experiments on schedule
+autoresearch daemon status   # check if running
+autoresearch daemon stop     # stop the daemon
+```
+
+Set `schedule.type` in config: `on-demand`, `overnight` (1am daily), `weekend` (Saturday 1am), or `cron` with a custom expression.
