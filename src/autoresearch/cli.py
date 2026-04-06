@@ -415,13 +415,13 @@ markers:
       immutable:
         - tests/**/*.py
     metric:
-      command: "echo 'your metric command here'"
-      extract: '(\\d+)'
+      command: "echo 'Found 42 errors'"
+      extract: 'grep -oP "\\d+"'
       direction: higher
       baseline: 0
     guard:
-      command: "echo 'your guard command here'"
-      extract: '(\\d+)'
+      command: "echo 'Found 0 issues'"
+      extract: 'grep -oP "\\d+"'
       threshold: 0
       rework_attempts: 2
     loop:

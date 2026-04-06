@@ -142,6 +142,8 @@ Based on the improvement goal from Step 6, suggest a metric command + extract pa
 
 Present the suggested metric to the user. Explain what the command does and what the extract pulls out. Let them confirm or customize.
 
+**CRITICAL:** The `extract` field must be a **shell command** (e.g., `grep -oP '\d+'`), NOT a regex pattern (e.g., `(\d+)`). The engine pipes the metric command output through the extract command: `metric_command | extract_command`. If extract is just a regex, the pipeline will fail silently and the metric will be None.
+
 **Important:** Offer to run the metric command right now to establish the baseline value. If the user agrees, use the baseline measurement script in Step 12.
 
 ---

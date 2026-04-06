@@ -662,11 +662,21 @@ def _run_agent_step(
         repo_path=repo_path,
     )
 
+    head_before = git_head_short(worktree_path)
+
     agent_result = agent_runner.invoke(
         worktree_path, program, marker.loop.budget_per_experiment
     )
 
     commit_hash = git_commit(worktree_path, agent_result.description or "experiment")
+
+    # If agent already committed, git_commit finds nothing staged and returns "".
+    # Detect this by checking if HEAD moved during the agent run.
+    if not commit_hash:
+        head_after = git_head_short(worktree_path)
+        if head_after != head_before:
+            commit_hash = head_after
+            logger.info(f"Agent committed directly: {commit_hash}")
 
     if not commit_hash:
         esc.on_discard()
