@@ -250,7 +250,7 @@ class ClaudeCodeRunner(AgentRunner):
         build_cli_permission_flags,
     ) -> list[str]:
         """Build the claude CLI command list."""
-        model = self.agent_config.model or self.marker.loop.model or "sonnet"
+        model = self.agent_config.model or "sonnet"
         default_claude_md = default_agent_dir / "CLAUDE.md"
 
         cmd = [
@@ -347,7 +347,7 @@ def run_marker(
     discarded = 0
     crashed = 0
     final_status = "budget_exhausted"
-    max_experiments = marker.loop.max_experiments
+    max_experiments = marker.agent.max_experiments
 
     def _notify(exp_num: int, status: str, metric: float | None = None, desc: str = ""):
         if on_experiment:
@@ -390,7 +390,7 @@ def run_marker(
                 continue
 
             # Run harness to get new metric
-            timeout_sec = _parse_budget(marker.loop.budget_per_experiment)
+            timeout_sec = _parse_budget(marker.agent.budget_per_experiment)
             harness_result = run_harness(
                 marker.metric.command,
                 marker.metric.extract,
@@ -668,7 +668,7 @@ def _run_agent_step(
     head_before = git_head_short(worktree_path)
 
     agent_result = agent_runner.invoke(
-        worktree_path, program, marker.loop.budget_per_experiment
+        worktree_path, program, marker.agent.budget_per_experiment
     )
 
     commit_hash = git_commit(worktree_path, agent_result.description or "experiment")
@@ -786,7 +786,7 @@ def _handle_guard_failure(
 
     Returns True if the guard eventually passes.
     """
-    budget = marker.loop.budget_per_experiment
+    budget = marker.agent.budget_per_experiment
     for attempt in range(max_attempts):
         rework_prompt = (
             f"The guard command failed. Output:\n{guard_result.output[-500:]}\n"
@@ -795,7 +795,7 @@ def _handle_guard_failure(
         result = agent_runner.invoke(worktree_path, rework_prompt, budget)
         if result.success:
             git_commit(worktree_path, f"rework: fix guard (attempt {attempt + 1})")
-            timeout_sec = _parse_budget(marker.loop.budget_per_experiment)
+            timeout_sec = _parse_budget(marker.agent.budget_per_experiment)
             new_guard = run_guard(
                 marker.guard.command,
                 marker.guard.extract,

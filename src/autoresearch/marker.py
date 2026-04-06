@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from pathlib import Path
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 MARKER_FILENAME = ".autoresearch.yaml"
@@ -48,9 +48,11 @@ class Guard(BaseModel):
 
 
 class LoopConfig(BaseModel):
-    model: str = "sonnet"
-    budget_per_experiment: str = "10m"
-    max_experiments: int = 50
+    """Deprecated — fields moved to AgentConfig. Kept for backward compat."""
+
+    model: str = ""
+    budget_per_experiment: str = ""
+    max_experiments: int = 0
     max_cost: str | None = None
 
 
@@ -89,9 +91,12 @@ class AutoMerge(BaseModel):
 
 class AgentConfig(BaseModel):
     name: str = "default"
-    model: str = ""
+    model: str = "sonnet"
     effort: str = "medium"
     permission_mode: str = "bypassPermissions"
+    budget_per_experiment: str = "10m"
+    max_experiments: int = 50
+    max_cost: str | None = None
     allowed_tools: list[str] = []
     disallowed_tools: list[str] = []
     extra_flags: list[str] = []
@@ -104,12 +109,25 @@ class Marker(BaseModel):
     target: Target
     metric: Metric
     guard: Guard = Guard()
-    loop: LoopConfig
+    loop: LoopConfig = LoopConfig()
     escalation: Escalation = Escalation()
     schedule: Schedule = Schedule()
     results: ResultsConfig = ResultsConfig()
     agent: AgentConfig = AgentConfig()
     auto_merge: AutoMerge = AutoMerge()
+
+    @model_validator(mode="after")
+    def _migrate_loop_to_agent(self):
+        """Backward compat: if loop has values, copy them to agent."""
+        if self.loop.model and not self.agent.model:
+            self.agent.model = self.loop.model
+        if self.loop.budget_per_experiment:
+            self.agent.budget_per_experiment = self.loop.budget_per_experiment
+        if self.loop.max_experiments:
+            self.agent.max_experiments = self.loop.max_experiments
+        if self.loop.max_cost:
+            self.agent.max_cost = self.loop.max_cost
+        return self
 
 
 class MarkerFile(BaseModel):

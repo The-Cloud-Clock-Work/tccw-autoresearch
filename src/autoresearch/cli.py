@@ -209,8 +209,8 @@ def status_cmd(
         data["direction"] = m.metric.direction.value
         data["target_metric"] = m.metric.target
         data["mutable_files"] = m.target.mutable
-        data["budget"] = m.loop.budget_per_experiment
-        data["max_experiments"] = m.loop.max_experiments
+        data["budget"] = m.agent.budget_per_experiment
+        data["max_experiments"] = m.agent.max_experiments
 
     if is_headless(ctx):
         headless_output(ctx, ok_json(data))
@@ -425,15 +425,13 @@ markers:
       extract: 'grep -oP "\\d+"'
       threshold: 0
       rework_attempts: 2
-    loop:
-      model: sonnet
-      budget_per_experiment: 25m
-      max_experiments: 10
     agent:
       name: default
       model: sonnet
       effort: medium
       permission_mode: bypassPermissions
+      budget_per_experiment: 25m
+      max_experiments: 10
       allowed_tools: []
       disallowed_tools: []
     auto_merge:

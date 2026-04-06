@@ -92,7 +92,7 @@ def generate_program(
         direction=marker.metric.direction.value,
         baseline_line=baseline_line,
         target_line=target_line,
-        budget=marker.loop.budget_per_experiment,
+        budget=marker.agent.budget_per_experiment,
         issues_section=issues_section,
         escalation_section=_escalation_instructions(escalation_level),
         results_section=_format_results_section(results_summary),

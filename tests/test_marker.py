@@ -130,12 +130,14 @@ class TestMarkerDefaults:
         assert e.search_after_pivots == 2
         assert e.halt_after_pivots == 3
 
-    def test_loop_config_defaults(self):
-        from autoresearch.marker import LoopConfig
-        lc = LoopConfig()
-        assert lc.model == "sonnet"
-        assert lc.max_experiments == 50
-        assert lc.budget_per_experiment == "10m"
+    def test_agent_config_defaults(self):
+        from autoresearch.marker import AgentConfig
+        ac = AgentConfig()
+        assert ac.model == "sonnet"
+        assert ac.max_experiments == 50
+        assert ac.budget_per_experiment == "10m"
+        assert ac.effort == "medium"
+        assert ac.permission_mode == "bypassPermissions"
 
     def test_marker_status_enum_values(self):
         assert MarkerStatus.ACTIVE == "active"
