@@ -53,3 +53,6 @@ coverage.xml
 
 .claude/settings.local.json
 scheduled_tasks.lock
+.claude/CLAUDE.local.md
+local.*
+CLAUDE.local.md
