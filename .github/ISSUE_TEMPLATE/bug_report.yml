@@ -15,7 +15,7 @@ body:
       label: Steps to Reproduce
       description: Minimal steps to reproduce the issue
       placeholder: |
-        1. pip install tccw-autoresearch
+        1. pip install tcc-autoresearch
         2. autoresearch init
         3. ...
     validations:

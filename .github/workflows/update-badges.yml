@@ -29,7 +29,7 @@ jobs:
           METRICS=$(curl -sf -u "${SONAR_TOKEN}:" \
             -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" \
             -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" \
-            "${SONAR_HOST_URL}/api/measures/component?component=tccw-autoresearch&metricKeys=coverage,bugs,vulnerabilities,code_smells,alert_status,security_rating,duplicated_lines_density")
+            "${SONAR_HOST_URL}/api/measures/component?component=tcc-autoresearch&metricKeys=coverage,bugs,vulnerabilities,code_smells,alert_status,security_rating,duplicated_lines_density")
 
           mkdir -p badges
 

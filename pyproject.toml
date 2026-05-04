@@ -1,5 +1,5 @@
 [project]
-name = "tccw-autoresearch"
+name = "tcc-autoresearch"
 version = "0.3.3"
 description = "Agnostic autonomous improvement engine — point it at any codebase, it makes it measurably better overnight"
 authors = [{name = "The Cloud Clockwork"}]
@@ -28,9 +28,9 @@ dependencies = [
 dev = ["pytest>=8.0", "pytest-cov", "ruff>=0.4", "mypy>=1.10"]
 
 [project.urls]
-Homepage = "https://github.com/The-Cloud-Clockwork/tccw-autoresearch"
-Repository = "https://github.com/The-Cloud-Clockwork/tccw-autoresearch"
-Issues = "https://github.com/The-Cloud-Clockwork/tccw-autoresearch/issues"
+Homepage = "https://github.com/The-Cloud-Clockwork/tcc-autoresearch"
+Repository = "https://github.com/The-Cloud-Clockwork/tcc-autoresearch"
+Issues = "https://github.com/The-Cloud-Clockwork/tcc-autoresearch/issues"
 
 [project.scripts]
 autoresearch = "autoresearch.cli:app"

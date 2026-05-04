@@ -10,7 +10,7 @@ MISSING=0
 if command -v autoresearch &>/dev/null; then
   echo "OK: autoresearch found ($(autoresearch --version 2>/dev/null || echo 'version unknown'))"
 else
-  echo "MISSING: autoresearch — run 'pip install -e .' from the tccw-autoresearch directory" >&2
+  echo "MISSING: autoresearch — run 'pip install -e .' from the tcc-autoresearch directory" >&2
   MISSING=1
 fi
 

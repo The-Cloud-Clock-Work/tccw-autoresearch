@@ -1,15 +1,15 @@
 # The Cloud Clockwork - Autoresearch
 
-[![Quality Gate](https://img.shields.io/endpoint?url=https://the-cloud-clockwork.github.io/tccw-autoresearch/badges/quality-gate.json)](https://the-cloud-clockwork.github.io/tccw-autoresearch/)
-[![Coverage](https://img.shields.io/endpoint?url=https://the-cloud-clockwork.github.io/tccw-autoresearch/badges/coverage.json)](https://the-cloud-clockwork.github.io/tccw-autoresearch/)
-[![Bugs](https://img.shields.io/endpoint?url=https://the-cloud-clockwork.github.io/tccw-autoresearch/badges/bugs.json)](https://the-cloud-clockwork.github.io/tccw-autoresearch/)
-[![Vulnerabilities](https://img.shields.io/endpoint?url=https://the-cloud-clockwork.github.io/tccw-autoresearch/badges/vulnerabilities.json)](https://the-cloud-clockwork.github.io/tccw-autoresearch/)
-[![Code Smells](https://img.shields.io/endpoint?url=https://the-cloud-clockwork.github.io/tccw-autoresearch/badges/code-smells.json)](https://the-cloud-clockwork.github.io/tccw-autoresearch/)
+[![Quality Gate](https://img.shields.io/endpoint?url=https://the-cloud-clockwork.github.io/tcc-autoresearch/badges/quality-gate.json)](https://the-cloud-clockwork.github.io/tcc-autoresearch/)
+[![Coverage](https://img.shields.io/endpoint?url=https://the-cloud-clockwork.github.io/tcc-autoresearch/badges/coverage.json)](https://the-cloud-clockwork.github.io/tcc-autoresearch/)
+[![Bugs](https://img.shields.io/endpoint?url=https://the-cloud-clockwork.github.io/tcc-autoresearch/badges/bugs.json)](https://the-cloud-clockwork.github.io/tcc-autoresearch/)
+[![Vulnerabilities](https://img.shields.io/endpoint?url=https://the-cloud-clockwork.github.io/tcc-autoresearch/badges/vulnerabilities.json)](https://the-cloud-clockwork.github.io/tcc-autoresearch/)
+[![Code Smells](https://img.shields.io/endpoint?url=https://the-cloud-clockwork.github.io/tcc-autoresearch/badges/code-smells.json)](https://the-cloud-clockwork.github.io/tcc-autoresearch/)
 
 **A Claude Code wrapper that makes any codebase measurably better overnight.**
 
 ```bash
-pip install tccw-autoresearch
+pip install tcc-autoresearch
 cd your-project
 autoresearch init
 ```
@@ -24,7 +24,7 @@ Claude opens. It scans your project. Asks what you want to improve. Configures e
 flowchart TD
     subgraph INSTALL["<b>1 ◼ INSTALL</b>"]
         direction LR
-        A1["pip install<br/>tccw-autoresearch"]:::install
+        A1["pip install<br/>tcc-autoresearch"]:::install
         A2["cd your-project"]:::install
         A1 --> A2
     end
@@ -130,7 +130,7 @@ That's it. No Docker. No GPU. No ML frameworks. No infrastructure.
 ### 1. Install
 
 ```bash
-pip install tccw-autoresearch
+pip install tcc-autoresearch
 ```
 
 ### 2. Initialize (AI-guided)
@@ -343,8 +343,8 @@ src/autoresearch/
 
 ## Links
 
-- **PyPI:** [tccw-autoresearch](https://pypi.org/project/tccw-autoresearch/)
-- **Docs:** [the-cloud-clockwork.github.io/tccw-autoresearch](https://the-cloud-clockwork.github.io/tccw-autoresearch/)
+- **PyPI:** [tcc-autoresearch](https://pypi.org/project/tcc-autoresearch/)
+- **Docs:** [the-cloud-clockwork.github.io/tcc-autoresearch](https://the-cloud-clockwork.github.io/tcc-autoresearch/)
 - **SonarQube:** See badges above — auto-updated on every scan
 
 ---

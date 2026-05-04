@@ -2,7 +2,7 @@
 
 ## Identity
 
-**Project:** tccw-autoresearch -- Agnostic autonomous improvement engine
+**Project:** tcc-autoresearch -- Agnostic autonomous improvement engine
 **Operator:** Nestor Colt
 **Protocol:** Concise, precise, structured output. No filler.
 **Voice-to-Text:** Operator uses voice-to-text ~90%. English is not native. Resolve mispronunciations silently.
@@ -77,7 +77,7 @@ Blocks may run in parallel (different worktrees, different agents). Block depend
 ## Project Structure (planned)
 
 ```
-tccw-autoresearch/
+tcc-autoresearch/
 +-- CLAUDE.md                # This file
 +-- operator/                # Operator-owned documents
 |   +-- VISION.md            # Read every conversation

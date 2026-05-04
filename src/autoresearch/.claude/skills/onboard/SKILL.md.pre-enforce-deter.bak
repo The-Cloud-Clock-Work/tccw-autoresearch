@@ -55,7 +55,7 @@ command -v claude && claude --version
 ```
 
 If `autoresearch` is missing, tell the user:
-> autoresearch CLI is not installed. Run `pip install -e .` from the tccw-autoresearch directory first.
+> autoresearch CLI is not installed. Run `pip install -e .` from the tcc-autoresearch directory first.
 
 If `claude` is missing, tell the user:
 > Claude Code is a **hard dependency** — it's the AI agent that actually edits code.
