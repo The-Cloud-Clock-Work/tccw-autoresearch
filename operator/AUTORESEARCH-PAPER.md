@@ -403,11 +403,11 @@ This is the engineering.
 
 ## Links
 
-- **tccw-autoresearch:** [PyPI](https://pypi.org/project/tccw-autoresearch/) | [GitHub](https://github.com/The-Cloud-Clock-Work/tccw-autoresearch) | [Docs](https://the-cloud-clock-work.github.io/tccw-autoresearch/)
+- **tccw-autoresearch:** [PyPI](https://pypi.org/project/tccw-autoresearch/) | [GitHub](https://github.com/The-Cloud-Clockwork/tccw-autoresearch) | [Docs](https://the-cloud-clockwork.github.io/tccw-autoresearch/)
 - **Karpathy's autoresearch:** [GitHub](https://github.com/karpathy/autoresearch) (53,500+ stars)
 - **Karpathy's program.md:** [Direct link](https://github.com/karpathy/autoresearch/blob/master/program.md)
 - **Shopify/Liquid results:** [Simon Willison's analysis](https://simonwillison.net/2026/Mar/13/liquid/)
 
 ---
 
-*Built by [The Cloud Clock Work](https://github.com/The-Cloud-Clock-Work). 100/100 production-validated. Every claim in this document has a corresponding test, PR, or commit.*
+*Built by [The Cloud Clockwork](https://github.com/The-Cloud-Clockwork). 100/100 production-validated. Every claim in this document has a corresponding test, PR, or commit.*

@@ -16,7 +16,7 @@ A Claude Code wrapper that makes any codebase measurably better overnight.
   <a href="#quick-start" class="btn btn-primary fs-5 mr-2">Quick Start</a>
   <a href="{{ site.baseurl }}/docs/0A-ARCHITECTURE/" class="btn btn-green fs-5 mr-2">Architecture</a>
   <a href="https://pypi.org/project/tccw-autoresearch/" class="btn fs-5 mr-2" target="_blank">PyPI</a>
-  <a href="https://github.com/The-Cloud-Clock-Work/tccw-autoresearch" class="btn fs-5" target="_blank">GitHub</a>
+  <a href="https://github.com/The-Cloud-Clockwork/tccw-autoresearch" class="btn fs-5" target="_blank">GitHub</a>
 </div>
 
 ---
