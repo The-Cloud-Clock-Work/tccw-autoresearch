@@ -4,7 +4,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl jq bc && rm -rf /var/lib/apt/lists/*
 
 # Claude Code CLI (native installer)
-RUN curl -fsSL https://claude.ai/install.sh | sh
+RUN apt-get update && apt-get install -y --no-install-recommends bash && rm -rf /var/lib/apt/lists/* \
+ && curl -fsSL https://claude.ai/install.sh | bash
 
 # GitHub CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
