@@ -2,7 +2,7 @@ title: AutoResearch
 description: >-
   Agnostic autonomous improvement engine.
   Point it at any codebase — it makes it measurably better overnight.
-url: "https://the-cloud-clock-work.github.io"
+url: "https://the-cloud-clockwork.github.io"
 baseurl: "/tccw-autoresearch"
 
 remote_theme: just-the-docs/just-the-docs@v0.10.0
@@ -19,20 +19,20 @@ mermaid:
   version: "11"
 
 aux_links:
-  GitHub: "https://github.com/The-Cloud-Clock-Work/tccw-autoresearch"
+  GitHub: "https://github.com/The-Cloud-Clockwork/tccw-autoresearch"
   PyPI: "https://pypi.org/project/tccw-autoresearch/"
 aux_links_new_tab: true
 
 gh_edit_link: true
 gh_edit_link_text: "Edit this page on GitHub"
-gh_edit_repository: "https://github.com/The-Cloud-Clock-Work/tccw-autoresearch"
+gh_edit_repository: "https://github.com/The-Cloud-Clockwork/tccw-autoresearch"
 gh_edit_branch: "main"
 gh_edit_view_mode: "edit"
 
 footer_content: >-
   AutoResearch is open source under the
-  <a href="https://github.com/The-Cloud-Clock-Work/tccw-autoresearch/blob/main/LICENSE">MIT License</a>.
-  Maintained by <a href="https://github.com/The-Cloud-Clock-Work">The Cloud Clock Work</a>.
+  <a href="https://github.com/The-Cloud-Clockwork/tccw-autoresearch/blob/main/LICENSE">MIT License</a>.
+  Maintained by <a href="https://github.com/The-Cloud-Clockwork">The Cloud Clockwork</a>.
 
 back_to_top: true
 back_to_top_text: "Back to top"

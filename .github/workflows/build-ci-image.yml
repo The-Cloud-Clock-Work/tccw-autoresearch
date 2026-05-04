@@ -32,4 +32,4 @@ jobs:
           context: .
           file: Dockerfile.ci
           push: true
-          tags: ghcr.io/the-cloud-clock-work/autoresearch-ci:latest
+          tags: ghcr.io/the-cloud-clockwork/autoresearch-ci:latest
