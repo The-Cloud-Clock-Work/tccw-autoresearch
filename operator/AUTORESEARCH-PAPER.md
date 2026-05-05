@@ -1,4 +1,4 @@
-# From Karpathy's Overnight Loop to a Production Agentic CLI: How tccw-autoresearch Makes Any Codebase Measurably Better While You Sleep
+# From Karpathy's Overnight Loop to a Production Agentic CLI: How tcc-autoresearch Makes Any Codebase Measurably Better While You Sleep
 
 > *"Give an AI agent a small but real LLM training setup and let it experiment autonomously overnight."*
 > — Andrej Karpathy, March 7, 2026
@@ -11,7 +11,7 @@ In March 2026, Andrej Karpathy released [autoresearch](https://github.com/karpat
 
 Karpathy called it *"just a recipe/idea"* — deliberately minimal, single-metric, single-file, tied to ML training. He issued a clear challenge: *"Any metric you care about that is reasonably efficient to evaluate... can be autoresearched by an agent swarm."*
 
-This paper describes **tccw-autoresearch** — a production CLI tool (`pip install tccw-autoresearch`) that answers that challenge. It takes Karpathy's core algorithm and makes it work on **any codebase, any metric, any agent**, with statistical rigor, graduated intelligence, and a full publish pipeline. It ships as a PyPI package with interactive onboarding, a live TUI, a scheduling daemon, and 2,554 tests at 92.4% coverage.
+This paper describes **tcc-autoresearch** — a production CLI tool (`pip install tcc-autoresearch`) that answers that challenge. It takes Karpathy's core algorithm and makes it work on **any codebase, any metric, any agent**, with statistical rigor, graduated intelligence, and a full publish pipeline. It ships as a PyPI package with interactive onboarding, a live TUI, a scheduling daemon, and 2,554 tests at 92.4% coverage.
 
 The paradigm didn't change. The execution did.
 
@@ -141,12 +141,12 @@ Karpathy's loop works because he made three things fixed: the metric, the mutabl
 
 ---
 
-## Part III: tccw-autoresearch — The Production Answer
+## Part III: tcc-autoresearch — The Production Answer
 
 ### Three Commands
 
 ```bash
-pip install tccw-autoresearch
+pip install tcc-autoresearch
 cd /path/to/your-project
 autoresearch init    # Claude scans your project, asks questions, writes config
 autoresearch run     # experiments begin
@@ -197,7 +197,7 @@ The guard is a second, independent metric that must not regress. Improve lint wi
 
 #### 1. Graduated Escalation (The EscalationState Machine)
 
-Karpathy's loop says "think harder" when stuck. tccw-autoresearch implements a 4-tier state machine that tracks failure patterns and adapts the agent's instructions:
+Karpathy's loop says "think harder" when stuck. tcc-autoresearch implements a 4-tier state machine that tracks failure patterns and adapts the agent's instructions:
 
 | Consecutive Failures | Level | Agent Directive |
 |---------------------|-------|----------------|
@@ -265,7 +265,7 @@ This prevents the common failure mode where the agent is mid-edit when time expi
 
 #### 7. Full Publish Pipeline
 
-The original autoresearch produces a git branch. tccw-autoresearch ships a complete publish pipeline:
+The original autoresearch produces a git branch. tcc-autoresearch ships a complete publish pipeline:
 
 1. Push experiment branch to remote
 2. Create PR via `gh pr create` with metric delta in the body
@@ -318,7 +318,7 @@ Every command supports `--headless` for JSON output. The TUI and headless modes 
 
 The system was validated end-to-end on a real project (not itself):
 
-1. `pip install tccw-autoresearch` in a fresh venv
+1. `pip install tcc-autoresearch` in a fresh venv
 2. `autoresearch init` -> Claude scanned the project, asked questions, wrote config
 3. `autoresearch run` -> 10 experiments with Rich Live progress panel
 4. Baseline 1 -> 16 skill documentation files created
@@ -340,7 +340,7 @@ The system was validated end-to-end on a real project (not itself):
 
 ### Self-Improvement Loop
 
-tccw-autoresearch was used to improve `antoncore` (the infrastructure monorepo it was built for):
+tcc-autoresearch was used to improve `antoncore` (the infrastructure monorepo it was built for):
 
 | Run | Before | After | Delta | PR |
 |-----|--------|-------|-------|----|
@@ -354,10 +354,10 @@ Three overnight runs. 186 lint errors to zero. Each run produced a PR with full 
 
 ## Part V: The Paradigm Comparison
 
-| Dimension | Karpathy's autoresearch | tccw-autoresearch |
+| Dimension | Karpathy's autoresearch | tcc-autoresearch |
 |-----------|----------------------|------------------|
 | **Nature** | Recipe/idea/demonstration | Production CLI tool |
-| **Installation** | Clone repo, read program.md, adapt manually | `pip install tccw-autoresearch` |
+| **Installation** | Clone repo, read program.md, adapt manually | `pip install tcc-autoresearch` |
 | **Onboarding** | Write your own program.md | `autoresearch init` (interactive AI wizard) |
 | **Metric** | Hardcoded `val_bpb` in locked Python file | Any shell command that outputs a number |
 | **Scope** | Single file (`train.py`) | Any set of globs (`src/**/*.py`) |
@@ -383,7 +383,7 @@ What changes is everything around the loop: the intelligence when stuck, the saf
 
 ## Part VI: What This Means
 
-Karpathy framed autoresearch as *"not to emulate a single PhD student, it's to emulate a research community."* His implementation emulates one PhD student running one experiment. tccw-autoresearch emulates one research community member who:
+Karpathy framed autoresearch as *"not to emulate a single PhD student, it's to emulate a research community."* His implementation emulates one PhD student running one experiment. tcc-autoresearch emulates one research community member who:
 
 - **Knows what failed before** (ideas backlog)
 - **Adapts strategy when stuck** (graduated escalation)
@@ -403,7 +403,7 @@ This is the engineering.
 
 ## Links
 
-- **tccw-autoresearch:** [PyPI](https://pypi.org/project/tccw-autoresearch/) | [GitHub](https://github.com/The-Cloud-Clockwork/tccw-autoresearch) | [Docs](https://the-cloud-clockwork.github.io/tccw-autoresearch/)
+- **tcc-autoresearch:** [PyPI](https://pypi.org/project/tcc-autoresearch/) | [GitHub](https://github.com/The-Cloud-Clockwork/tcc-autoresearch) | [Docs](https://the-cloud-clockwork.github.io/tcc-autoresearch/)
 - **Karpathy's autoresearch:** [GitHub](https://github.com/karpathy/autoresearch) (53,500+ stars)
 - **Karpathy's program.md:** [Direct link](https://github.com/karpathy/autoresearch/blob/master/program.md)
 - **Shopify/Liquid results:** [Simon Willison's analysis](https://simonwillison.net/2026/Mar/13/liquid/)

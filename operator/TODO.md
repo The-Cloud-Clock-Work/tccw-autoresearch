@@ -26,7 +26,7 @@
 - 2026-03-30: Execution model resolved — repo is self-contained. CLI reads marker from repo. Any system that runs `autoresearch run -m <marker> --headless` in a cloned repo is an executor. No adapters, no plugins, no special payloads.
 - 2026-03-30: Agenticore integration = just `run_task(task="autoresearch run -m X --headless")`. Agenticore doesn't need to understand autoresearch.
 - 2026-03-30: `/enhance-cli` skill created in cc-colt-tools (was planned for this repo, moved to portable location). Enforces interactive TUI + headless dual-mode on any CLI
-- 2026-03-30: Name collision — 323+ repos use "autoresearch" on GitHub. Our repo: `tccw-autoresearch`
+- 2026-03-30: Name collision — 323+ repos use "autoresearch" on GitHub. Our repo: `tcc-autoresearch`
 
 ## Don't Forget
 

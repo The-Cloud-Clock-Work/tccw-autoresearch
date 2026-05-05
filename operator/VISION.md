@@ -1,4 +1,4 @@
-# TCCW-AutoResearch Vision
+# TCC-AutoResearch Vision
 
 > **Author:** Nestor Colt
 > **Date:** 2026-03-30
@@ -88,7 +88,7 @@ Because the repo is self-contained and the CLI is the universal interface, defer
 - **GitHub Actions** -- `run: autoresearch run -m auth-flow --headless` in a workflow step. Same thing.
 - **Cron on any machine** -- `0 1 * * * cd /path/to/repo && autoresearch run -m auth-flow --headless`
 
-The only prerequisite: the `autoresearch` CLI must be available in the execution environment (`pip install tccw-autoresearch` or pre-installed in the container image).
+The only prerequisite: the `autoresearch` CLI must be available in the execution environment (`pip install tcc-autoresearch` or pre-installed in the container image).
 
 This is intentional. No integration layer means no integration maintenance. Any future execution backend works automatically as long as it can run a shell command in a repo.
 

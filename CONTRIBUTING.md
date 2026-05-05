@@ -11,8 +11,8 @@ Thanks for your interest in contributing to AutoResearch.
 ## Setup
 
 ```bash
-git clone https://github.com/The-Cloud-Clockwork/tccw-autoresearch.git
-cd tccw-autoresearch
+git clone https://github.com/The-Cloud-Clockwork/tcc-autoresearch.git
+cd tcc-autoresearch
 pip install -e ".[dev]"
 ```
 
@@ -41,7 +41,7 @@ We use [SonarQube](https://sonarcloud.io) for continuous inspection. All PRs mus
 ## What to Contribute
 
 - **New metric harnesses** — common `metric.command` + `metric.extract` recipes for popular tools
-- **Bug fixes** — check [issues](https://github.com/The-Cloud-Clockwork/tccw-autoresearch/issues)
+- **Bug fixes** — check [issues](https://github.com/The-Cloud-Clockwork/tcc-autoresearch/issues)
 - **Documentation** — improvements to docs, examples, tutorials
 - **Agent profiles** — custom agent configurations for specific use cases
 

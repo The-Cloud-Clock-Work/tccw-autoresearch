@@ -12,7 +12,7 @@ nav_order: 3
 ## Install
 
 ```bash
-pip install tccw-autoresearch
+pip install tcc-autoresearch
 ```
 
 Requires Python 3.10+ and [Claude Code](https://docs.anthropic.com/en/docs/claude-code) on PATH.

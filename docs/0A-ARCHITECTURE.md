@@ -7,11 +7,11 @@ nav_order: 2
 
 # Architecture
 
-> System architecture, core loop, and design principles for tccw-autoresearch.
+> System architecture, core loop, and design principles for tcc-autoresearch.
 
 ## Overview
 
-tccw-autoresearch is an **agnostic autonomous improvement engine** that implements the Karpathy autoresearch loop pattern for any codebase. It edits target files, runs an immutable harness, measures a single metric, keeps improvements, and discards regressions.
+tcc-autoresearch is an **agnostic autonomous improvement engine** that implements the Karpathy autoresearch loop pattern for any codebase. It edits target files, runs an immutable harness, measures a single metric, keeps improvements, and discards regressions.
 
 ## Core Loop
 

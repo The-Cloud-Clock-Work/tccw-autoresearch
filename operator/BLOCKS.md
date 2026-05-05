@@ -128,7 +128,7 @@ The runtime. Long-running daemon for scheduled execution, plus pip-installable p
 - [x] Log management: `~/.autoresearch/daemon.log`
 - [x] Max concurrent markers limit
 - [x] Crash recovery: detect stale PID (auto-restart deferred per SPECS 3.4)
-- [x] `pip install tccw-autoresearch` packaging (PyPI or private index)
+- [x] `pip install tcc-autoresearch` packaging (PyPI or private index)
 - [x] Entry point: `autoresearch` CLI binary via pyproject.toml `[project.scripts]`
 - [x] `.autoresearch.yaml` dogfood: markers for this repo's own self-improvement
 - [x] End-to-end verification: fresh install → add marker → run → results

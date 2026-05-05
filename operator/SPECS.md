@@ -117,7 +117,7 @@ $ autoresearch
   #  Repo                  Marker                   Status     Last Run
   1  antoncore             auth-flow-reliability     * active   2h ago
   2  antoncore             build-speed               o skip     --
-  3  tccw-autoresearch     engine-tests              * active   14h ago
+  3  tcc-autoresearch     engine-tests              * active   14h ago
   4  agenticore            worktree-perf             # paused   3d ago
 
   [1-4] Select marker    [a] Add marker    [d] Detach marker
@@ -299,7 +299,7 @@ ssh server "cd repo && autoresearch run -m auth-flow --headless"
 
 **Prerequisite for remote execution:**
 The `autoresearch` CLI must be installed in the execution environment. Options:
-- `pip install tccw-autoresearch` (from PyPI or private index)
+- `pip install tcc-autoresearch` (from PyPI or private index)
 - Pre-installed in container image (for agenticore, CI runners)
 - Vendored as a script in the target repo (zero-dependency fallback, future consideration)
 
@@ -556,7 +556,7 @@ notifications:
 ## 7. `/enhance-cli` Skill
 
 ### 7.1 Location
-- Lives in `tccw-autoresearch/skills/enhance-cli/`
+- Lives in `tcc-autoresearch/skills/enhance-cli/`
 - Tested and perfected on this project's CLI
 - Reusable -- can be copied to or referenced from any project
 
@@ -677,7 +677,7 @@ No payloads to construct, no configs to transfer, no integration code to maintai
 - Only requirement: CLI + LLM runtime available on the host
 
 ### 9.6 CLI Packaging (for remote environments)
-- Primary: `pip install tccw-autoresearch` (PyPI or private index)
+- Primary: `pip install tcc-autoresearch` (PyPI or private index)
 - Container: pre-baked into execution container images
 - Future consideration: single-file vendored script for zero-dependency bootstrap
 
